@@ -1,0 +1,27 @@
+name: Build Dylib
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Compile Dylib
+      run: |
+        clang -dynamiclib -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+              -arch arm64 -miphoneos-version-min=14.0 \
+              -framework UIKit -framework Foundation \
+              KeyUI.m -o KeyUI.dylib
+
+    - name: Upload Dylib Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: KeyUI-Dylib
+        path: KeyUI.dylib

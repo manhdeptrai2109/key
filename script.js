@@ -23,7 +23,7 @@ var products = [
 ];
 
 function $(id) { return document.getElementById(id); }
-function money(n) { return n.toLocaleString("vi-VN") + "d"; }
+function money(n) { return n.toLocaleString("vi-VN") + "đ"; }
 
 function getProduct(id) {
   for (var i = 0; i < products.length; i++) {
@@ -334,14 +334,10 @@ function getUserHistory() {
 
   var history = getRechargeHistory();
   var userHistory = [];
-  var totalAmount = 0;
   
   for (var i = 0; i < history.length; i++) {
     if (history[i].username === user.name) {
       userHistory.push(history[i]);
-      if (history[i].type !== 'remove') {
-        totalAmount += history[i].amount;
-      }
     }
   }
 
@@ -489,6 +485,7 @@ function renderProducts(list) {
 
 function searchProducts() {
   var input = $("searchInput");
+  if (!input) return;
   var q = input.value.trim().toLowerCase();
   var result = [];
   
@@ -611,44 +608,44 @@ function showRechargePopup(rechargeCode, amount) {
 
   modal.innerHTML = `
     <div style="font-size:36px;margin-bottom:4px;">💰</div>
-    <h2 style="color:white;margin:0 0 3px;font-size:19px;">Nap tien vao vi</h2>
-    <p style="color:#b0b8e0;margin:0 0 14px;font-size:13px;">Quet ma QR de chuyen khoan</p>
+    <h2 style="color:white;margin:0 0 3px;font-size:19px;">Nạp tiền vào ví</h2>
+    <p style="color:#b0b8e0;margin:0 0 14px;font-size:13px;">Quét mã QR để chuyển khoản</p>
 
     <div style="background:#06082a;padding:14px;border-radius:12px;border:1px solid #4e3aa2;margin-bottom:14px;">
-      <p style="font-size:11px;color:#888;margin:0 0 8px;">📱 Quet ma QR</p>
-      <img src="images/manganhang.jpg" alt="Ma QR chuyen khoan" 
+      <p style="font-size:11px;color:#888;margin:0 0 8px;">📱 Quét mã QR</p>
+      <img src="images/manganhang.jpg" alt="Mã QR chuyển khoản" 
         style="width:100%;max-width:200px;height:auto;border-radius:10px;display:block;margin:0 auto;border:1px solid #4e3aa2;"
-        onerror="this.style.display='none'; this.parentNode.innerHTML='<p style=\\'color:#ff6b6b;font-size:13px;margin:10px;\\'>⚠️ Chua co anh QR<br><span style=\\'font-size:11px;color:#888;\\'>Vui long them images/manganhang.jpg</span></p>';">
+        onerror="this.style.display='none'; this.parentNode.innerHTML='<p style=\\'color:#ff6b6b;font-size:13px;margin:10px;\\'>⚠️ Chưa có ảnh QR<br><span style=\\'font-size:11px;color:#888;\\'>Vui lòng thêm images/manganhang.jpg</span></p>';">
     </div>
 
     <div style="margin:0 0 12px;text-align:left;background:#06082a;padding:12px 14px;border-radius:12px;border:1px solid #4e3aa2;">
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💳 Ngan hang:</strong> MB Bank</p>
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">🔢 So tai khoan:</strong> 08122261152109</p>
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">👤 Chu tai khoan:</strong> PHAM TIEN MANH</p>
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💰 So tien:</strong> <span style="color:#ff59e8;font-size:18px;font-weight:bold;">${money(amount)}</span></p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💳 Ngân hàng:</strong> MB Bank</p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">🔢 Số tài khoản:</strong> 08122261152109</p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">👤 Chủ tài khoản:</strong> PHAM TIEN MANH</p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💰 Số tiền:</strong> <span style="color:#ff59e8;font-size:18px;font-weight:bold;">${money(amount)}</span></p>
     </div>
 
     <div style="margin:0 0 14px;padding:12px;background:#fff3cd;border-radius:12px;border:2px solid #ffc107;">
-      <p style="color:#856404;font-weight:bold;margin:0 0 4px;font-size:13px;">📌 Noi dung chuyen khoan:</p>
+      <p style="color:#856404;font-weight:bold;margin:0 0 4px;font-size:13px;">📌 Nội dung chuyển khoản:</p>
       <p style="font-size:18px;font-weight:bold;color:#d63384;margin:0;word-break:break-all;user-select:all;letter-spacing:1px;">${rechargeCode}</p>
       <p style="margin:6px 0 0;font-size:13px;color:#888;">
-        ⏰ Con <strong style="color:#ffd43b;font-size:16px;" id="${timerId}">10:00</strong> phut de chuyen khoan
+        ⏰ Còn <strong style="color:#ffd43b;font-size:16px;" id="${timerId}">10:00</strong> phút để chuyển khoản
       </p>
     </div>
 
     <button onclick="copyContent('${rechargeCode}')" 
       style="width:100%;padding:10px;background:linear-gradient(135deg,#0d6efd,#0b5ed7);color:white;border:none;border-radius:12px;font-size:14px;font-weight:bold;cursor:pointer;margin-bottom:8px;transition:0.3s;">
-      📋 Copy noi dung chuyen khoan
+      📋 Copy nội dung chuyển khoản
     </button>
 
     <button onclick="completeRecharge('${rechargeCode}', ${amount})" 
       style="width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:12px;font-size:15px;font-weight:bold;cursor:pointer;transition:0.3s;">
-      ✅ Toi da chuyen khoan
+      ✅ Tôi đã chuyển khoản
     </button>
 
     <button onclick="closePaymentPopup(this)" 
       style="width:100%;margin-top:6px;padding:8px;background:transparent;color:#888;border:1px solid #4e3aa2;border-radius:12px;font-size:13px;cursor:pointer;transition:0.3s;">
-      ❌ Dong
+      ❌ Đóng
     </button>
   `;
 
@@ -675,7 +672,7 @@ function showRechargePopup(rechargeCode, amount) {
         setTimeout(function() {
           var popup = document.querySelector(".custom-popup-overlay");
           if (popup) {
-            showPopup("⏰ Het thoi gian!", "Ma nap <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> da het hieu luc.<br><br>Vui long tao ma moi de nap tien.", "error");
+            showPopup("⏰ Hết thời gian!", "Mã nạp <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> đã hết hiệu lực.<br><br>Vui lòng tạo mã mới để nạp tiền.", "error");
             document.body.removeChild(popup);
           }
         }, 500);
@@ -709,7 +706,7 @@ function closePaymentPopup(btn) {
 function copyContent(text) {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(function() {
-      showPopup("✅ Da copy!", "Noi dung chuyen khoan da duoc sao chep.", "success");
+      showPopup("✅ Đã copy!", "Nội dung chuyển khoản đã được sao chép.", "success");
     }).catch(function() {
       fallbackCopy(text);
     });
@@ -727,9 +724,9 @@ function fallbackCopy(text) {
   textArea.select();
   try {
     document.execCommand("copy");
-    showPopup("✅ Da copy!", "Noi dung chuyen khoan da duoc sao chep.", "success");
+    showPopup("✅ Đã copy!", "Nội dung chuyển khoản đã được sao chép.", "success");
   } catch (err) {
-    showPopup("❌ Loi!", "Khong the copy, vui long copy thu cong.", "error");
+    showPopup("❌ Lỗi!", "Không thể copy, vui lòng copy thủ công.", "error");
   }
   document.body.removeChild(textArea);
 }
@@ -741,12 +738,12 @@ function fallbackCopy(text) {
 function completeRecharge(rechargeCode, amount) {
   var user = currentUser();
   if (!user) {
-    showPopup("Loi", "Vui long đăng nhập!", "error");
+    showPopup("Lỗi", "Vui lòng đăng nhập!", "error");
     return;
   }
 
   if (!isCodeValid(rechargeCode)) {
-    showPopup("⚠️ Ma da het han!", "Ma nap tien <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> da het hieu luc sau 10 phut.<br><br>Vui long tao ma moi de nap tien.", "error");
+    showPopup("⚠️ Mã đã hết hạn!", "Mã nạp tiền <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> đã hết hiệu lực sau 10 phút.<br><br>Vui lòng tạo mã mới để nạp tiền.", "error");
     return;
   }
 
@@ -764,8 +761,8 @@ function completeRecharge(rechargeCode, amount) {
   localStorage.setItem('pendingApprovals', JSON.stringify(pendingApprovals));
 
   showPopup(
-    "⏳ Cho admin xac nhan!",
-    "Ban da gui yeu cau nap <strong style='color:#ff59e8;'>" + money(amount) + "</strong>.<br><br>📌 Ma giao dich: <strong style='color:#ffd43b;'>" + rechargeCode + "</strong><br><br>⏳ Vui long doi admin xac nhan chuyen khoan.<br>💰 So du se duoc cap nhat sau khi admin duyet.",
+    "⏳ Chờ admin xác nhận!",
+    "Bạn đã gửi yêu cầu nạp <strong style='color:#ff59e8;'>" + money(amount) + "</strong>.<br><br>📌 Mã giao dịch: <strong style='color:#ffd43b;'>" + rechargeCode + "</strong><br><br>⏳ Vui lòng đợi admin xác nhận chuyển khoản.<br>💰 Số dư sẽ được cập nhật sau khi admin duyệt.",
     "success"
   );
 }
@@ -776,8 +773,8 @@ function completeRecharge(rechargeCode, amount) {
 
 function initUsers() {
   if (!localStorage.getItem("shopCuaManhUsers")) {
+    var defaultUsers = [{ name: "admin", password: "123" }];
     localStorage.setItem("shopCuaManhUsers", JSON.stringify(defaultUsers));
-    console.log("Da tao tai khoan mac dinh!");
   }
 }
 
@@ -823,7 +820,7 @@ function updateBalanceUI() {
         balanceEl = document.createElement("span");
         balanceEl.id = "userBalance";
         balanceEl.style.cssText = "color:#51cf66;font-weight:bold;font-size:13px;margin-right:6px;display:none;";
-        balanceEl.textContent = "0d";
+        balanceEl.textContent = "0đ";
         navActions.insertBefore(balanceEl, authBtn);
       }
     }
@@ -836,7 +833,6 @@ function updateBalanceUI() {
     var balance = getUserBalance(user.name);
     balanceEl.textContent = money(balance);
     balanceEl.style.display = "inline";
-    console.log("✅ So du da duoc cap nhat: " + money(balance));
   } else {
     balanceEl.style.display = "none";
   }
@@ -849,7 +845,7 @@ function updateBalanceUI() {
 function recharge() {
   var user = currentUser();
   if (!user) {
-    showPopup("Thong bao", "Vui long dang nhap de nap tien!", "error", function() {
+    showPopup("Thông báo", "Vui lòng đăng nhập để nạp tiền!", "error", function() {
       openLogin();
     });
     return;
@@ -892,8 +888,8 @@ function showRechargeOptions() {
   `;
 
   var html = '<div style="font-size:40px;margin-bottom:6px;">💰</div>';
-  html += '<h2 style="color:white;margin:0 0 4px;font-size:20px;">Chon so tien nap</h2>';
-  html += '<p style="color:#b0b8e0;margin:0 0 16px;font-size:13px;">Chon muc tien ban muon nap vao vi</p>';
+  html += '<h2 style="color:white;margin:0 0 4px;font-size:20px;">Chọn số tiền nạp</h2>';
+  html += '<p style="color:#b0b8e0;margin:0 0 16px;font-size:13px;">Chọn mức tiền bạn muốn nạp vào ví</p>';
   html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
   
   for (var i = 0; i < amounts.length; i++) {
@@ -907,7 +903,7 @@ function showRechargeOptions() {
   html += '</div>';
   html += '<button onclick="closePopupOverlay(this)" style="';
   html += 'width:100%;padding:10px;background:transparent;color:#888;border:1px solid #4e3aa2;border-radius:12px;font-size:14px;cursor:pointer;';
-  html += '">❌ Dong</button>';
+  html += '">❌ Đóng</button>';
 
   modal.innerHTML = html;
   overlay.appendChild(modal);
@@ -967,189 +963,209 @@ var logoutBtn = $("logoutBtn");
 var registerMode = false;
 
 function updateAuthFieldsState() {
-  loginNameInput.disabled = registerMode;
-  loginPasswordInput.disabled = registerMode;
-  registerNameInput.disabled = !registerMode;
-  registerPasswordInput.disabled = !registerMode;
-  registerConfirmInput.disabled = !registerMode;
+  if (loginNameInput) loginNameInput.disabled = registerMode;
+  if (loginPasswordInput) loginPasswordInput.disabled = registerMode;
+  if (registerNameInput) registerNameInput.disabled = !registerMode;
+  if (registerPasswordInput) registerPasswordInput.disabled = !registerMode;
+  if (registerConfirmInput) registerConfirmInput.disabled = !registerMode;
 }
 
 function openLogin() {
+  if (!loginModal) return;
   var user = currentUser();
   if (user) {
-    authForm.hidden = true;
-    switchAuthBtn.hidden = true;
-    logoutBtn.hidden = false;
-    loginFields.hidden = true;
-    registerFields.hidden = true;
-    authMessage.textContent = "Xin chao: " + user.name;
-    authMessage.style.color = "#ffd43b";
+    if (authForm) authForm.hidden = true;
+    if (switchAuthBtn) switchAuthBtn.hidden = true;
+    if (logoutBtn) logoutBtn.hidden = false;
+    if (loginFields) loginFields.hidden = true;
+    if (registerFields) registerFields.hidden = true;
+    if (authMessage) {
+      authMessage.textContent = "Xin chào: " + user.name;
+      authMessage.style.color = "#ffd43b";
+    }
   } else {
-    authForm.hidden = false;
-    switchAuthBtn.hidden = false;
-    logoutBtn.hidden = true;
-    loginFields.hidden = registerMode;
-    registerFields.hidden = !registerMode;
-    authMessage.textContent = "";
+    if (authForm) authForm.hidden = false;
+    if (switchAuthBtn) switchAuthBtn.hidden = false;
+    if (logoutBtn) logoutBtn.hidden = true;
+    if (loginFields) loginFields.hidden = registerMode;
+    if (registerFields) registerFields.hidden = !registerMode;
+    if (authMessage) authMessage.textContent = "";
   }
+  loginModal.setAttribute("aria-hidden", "false");
   loginModal.classList.add("open");
 }
 
 function closeLogin() {
+  if (!loginModal) return;
+  loginModal.setAttribute("aria-hidden", "true");
   loginModal.classList.remove("open");
-  authMessage.textContent = "";
-  authForm.hidden = false;
-  switchAuthBtn.hidden = false;
-  logoutBtn.hidden = true;
+  if (authMessage) authMessage.textContent = "";
+  if (authForm) authForm.hidden = false;
+  if (switchAuthBtn) switchAuthBtn.hidden = false;
+  if (logoutBtn) logoutBtn.hidden = true;
   updateAuthFieldsState();
 }
 
 function updateAuthUI() {
   var user = currentUser();
 
-  if (user) {
-    loginLabel.textContent = user.name;
-  } else {
-    loginLabel.textContent = "Dang nhap";
+  if (loginLabel) {
+    loginLabel.textContent = user ? user.name : "Đăng nhập";
   }
 
-  authTitle.textContent = registerMode ? "Tao tai khoan" : "Dang nhap";
-  authSubtitle.textContent = registerMode
-    ? "Tao tai khoan de luu thong tin mua hang"
-    : "Dang nhap de tiep tuc mua hang";
-  authSubmit.textContent = registerMode ? "Dang ky" : "Dang nhap";
-  loginFields.hidden = registerMode;
-  registerFields.hidden = !registerMode;
-  switchAuthBtn.innerHTML = registerMode
-    ? 'Da co tai khoan? <b>Dang nhap</b>'
-    : 'Chua co tai khoan? <b>Dang ky</b>';
+  if (authTitle) authTitle.textContent = registerMode ? "Tạo tài khoản" : "Đăng nhập";
+  if (authSubtitle) {
+    authSubtitle.textContent = registerMode
+      ? "Tạo tài khoản để lưu thông tin mua hàng"
+      : "Đăng nhập để tiếp tục mua hàng";
+  }
+  if (authSubmit) authSubmit.textContent = registerMode ? "Đăng ký" : "Đăng nhập";
+  if (loginFields) loginFields.hidden = registerMode;
+  if (registerFields) registerFields.hidden = !registerMode;
+  if (switchAuthBtn) {
+    switchAuthBtn.innerHTML = registerMode
+      ? 'Đã có tài khoản? <b>Đăng nhập</b>'
+      : 'Chưa có tài khoản? <b>Đăng ký</b>';
+  }
 
   updateAuthFieldsState();
   updateBalanceUI();
 }
 
-openLoginBtn.addEventListener("click", openLogin);
-closeLoginBtn.addEventListener("click", closeLogin);
-closeLoginBackdrop.addEventListener("click", closeLogin);
+if (openLoginBtn) openLoginBtn.addEventListener("click", openLogin);
+if (closeLoginBtn) closeLoginBtn.addEventListener("click", closeLogin);
+if (closeLoginBackdrop) closeLoginBackdrop.addEventListener("click", closeLogin);
 
-switchAuthBtn.addEventListener("click", function() {
-  registerMode = !registerMode;
-  authMessage.textContent = "";
-  authForm.hidden = false;
-  logoutBtn.hidden = true;
-  authForm.reset();
-  updateAuthUI();
-});
-
-authForm.addEventListener("submit", function(e) {
-  e.preventDefault();
-
-  if (registerMode) {
-    var name = registerNameInput.value.trim();
-    var password = registerPasswordInput.value;
-    var confirm = registerConfirmInput.value;
-
-    if (!name || !password || !confirm) {
-      authMessage.textContent = "Vui long nhap day du thong tin.";
-      authMessage.style.color = "#ff6b6b";
-      return;
+if (switchAuthBtn) {
+  switchAuthBtn.addEventListener("click", function() {
+    registerMode = !registerMode;
+    if (authMessage) authMessage.textContent = "";
+    if (authForm) {
+      authForm.hidden = false;
+      authForm.reset();
     }
-    if (password.length < 4) {
-      authMessage.textContent = "Mat khau phai co it nhat 4 ky tu.";
-      authMessage.style.color = "#ff6b6b";
-      return;
-    }
-    if (password !== confirm) {
-      authMessage.textContent = "Mat khau xac minh khong khop!";
-      authMessage.style.color = "#ff6b6b";
-      return;
-    }
+    if (logoutBtn) logoutBtn.hidden = true;
+    updateAuthUI();
+  });
+}
 
-    var users = getUsers();
-    for (var i = 0; i < users.length; i++) {
-      if (users[i].name.toLowerCase() === name.toLowerCase()) {
-        authMessage.textContent = "Ten hien thi nay da ton tai.";
+if (authForm) {
+  authForm.addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    if (registerMode) {
+      var name = registerNameInput.value.trim();
+      var password = registerPasswordInput.value;
+      var confirm = registerConfirmInput.value;
+
+      if (!name || !password || !confirm) {
+        authMessage.textContent = "Vui lòng nhập đầy đủ thông tin.";
         authMessage.style.color = "#ff6b6b";
         return;
       }
-    }
-
-    users.push({ name: name, password: password });
-    saveUsers(users);
-    
-    if (!localStorage.getItem("shopCuaManhBalance_" + name)) {
-      setUserBalance(name, 0);
-    }
-
-    registerMode = false;
-    loginNameInput.value = name;
-    loginPasswordInput.value = "";
-    registerNameInput.value = "";
-    registerPasswordInput.value = "";
-    registerConfirmInput.value = "";
-
-    authMessage.textContent = "Dang ky thanh cong! Hay nhap mat khau de dang nhap.";
-    authMessage.style.color = "#51cf66";
-    updateAuthUI();
-
-    setTimeout(function() {
-      loginPasswordInput.focus();
-    }, 100);
-  } else {
-    var name = loginNameInput.value.trim();
-    var password = loginPasswordInput.value;
-
-    if (!name || !password) {
-      authMessage.textContent = "Vui long nhap ten hien thi va mat khau.";
-      authMessage.style.color = "#ff6b6b";
-      return;
-    }
-
-    var users = getUsers();
-    var user = null;
-    for (var i = 0; i < users.length; i++) {
-      if (users[i].name.toLowerCase() === name.toLowerCase() &&
-          users[i].password === password) {
-        user = users[i];
-        break;
+      if (password.length < 4) {
+        authMessage.textContent = "Mật khẩu phải có ít nhất 4 ký tự.";
+        authMessage.style.color = "#ff6b6b";
+        return;
       }
-    }
+      if (password !== confirm) {
+        authMessage.textContent = "Mật khẩu xác minh không khớp!";
+        authMessage.style.color = "#ff6b6b";
+        return;
+      }
 
-    if (!user) {
-      authMessage.textContent = "Sai ten hien thi hoac mat khau.";
-      authMessage.style.color = "#ff6b6b";
-      return;
-    }
+      var users = getUsers();
+      for (var i = 0; i < users.length; i++) {
+        if (users[i].name.toLowerCase() === name.toLowerCase()) {
+          authMessage.textContent = "Tên hiển thị này đã tồn tại.";
+          authMessage.style.color = "#ff6b6b";
+          return;
+        }
+      }
 
-    setCurrentUser({ name: user.name });
-    authMessage.textContent = "Dang nhap thanh cong!";
-    authMessage.style.color = "#51cf66";
-    updateAuthUI();
+      users.push({ name: name, password: password });
+      saveUsers(users);
+      
+      if (!localStorage.getItem("shopCuaManhBalance_" + name)) {
+        setUserBalance(name, 0);
+      }
 
-    setTimeout(function() {
-      closeLogin();
-      authForm.reset();
-      showPopup("Chao mung! 🎉", "Chao mung <strong>" + user.name + "</strong> quay tro lai!", "success");
-    }, 500);
-  }
-});
-
-logoutBtn.addEventListener("click", function() {
-  showPopup("Xac nhan dang xuat", "Ban co chac muon dang xuat?", "confirm", function(result) {
-    if (result) {
-      removeCurrentUser();
-      authForm.hidden = false;
-      switchAuthBtn.hidden = false;
-      logoutBtn.hidden = true;
       registerMode = false;
-      authForm.reset();
-      authMessage.textContent = "Da dang xuat.";
-      authMessage.style.color = "#ffd43b";
+      loginNameInput.value = name;
+      loginPasswordInput.value = "";
+      registerNameInput.value = "";
+      registerPasswordInput.value = "";
+      registerConfirmInput.value = "";
+
+      authMessage.textContent = "Đăng ký thành công! Hãy nhập mật khẩu để đăng nhập.";
+      authMessage.style.color = "#51cf66";
       updateAuthUI();
-      showPopup("Da dang xuat", "Ban da dang xuat thanh cong!", "success");
+
+      setTimeout(function() {
+        if (loginPasswordInput) loginPasswordInput.focus();
+      }, 100);
+    } else {
+      var name = loginNameInput.value.trim();
+      var password = loginPasswordInput.value;
+
+      if (!name || !password) {
+        authMessage.textContent = "Vui lòng nhập tên hiển thị và mật khẩu.";
+        authMessage.style.color = "#ff6b6b";
+        return;
+      }
+
+      var users = getUsers();
+      var user = null;
+      for (var i = 0; i < users.length; i++) {
+        if (users[i].name.toLowerCase() === name.toLowerCase() &&
+            users[i].password === password) {
+          user = users[i];
+          break;
+        }
+      }
+
+      if (!user) {
+        authMessage.textContent = "Sai tên hiển thị hoặc mật khẩu.";
+        authMessage.style.color = "#ff6b6b";
+        return;
+      }
+
+      setCurrentUser({ name: user.name });
+      authMessage.textContent = "Đăng nhập thành công!";
+      authMessage.style.color = "#51cf66";
+      updateAuthUI();
+
+      setTimeout(function() {
+        closeLogin();
+        authForm.reset();
+        showPopup("Chào mừng! 🎉", "Chào mừng <strong>" + user.name + "</strong> quay trở lại!", "success");
+      }, 500);
     }
   });
-});
+}
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", function() {
+    showPopup("Xác nhận đăng xuất", "Bạn có chắc muốn đăng xuất?", "confirm", function(result) {
+      if (result) {
+        removeCurrentUser();
+        if (authForm) {
+          authForm.hidden = false;
+          authForm.reset();
+        }
+        if (switchAuthBtn) switchAuthBtn.hidden = false;
+        logoutBtn.hidden = true;
+        registerMode = false;
+        if (authMessage) {
+          authMessage.textContent = "Đã đăng xuất.";
+          authMessage.style.color = "#ffd43b";
+        }
+        updateAuthUI();
+        showPopup("Đã đăng xuất", "Bạn đã đăng xuất thành công!", "success");
+      }
+    });
+  });
+}
 
 // =============================================
 // MODAL LIEN HE
@@ -1220,14 +1236,14 @@ function addNavButtons() {
   var balanceSpan = document.createElement("span");
   balanceSpan.id = "userBalance";
   balanceSpan.style.cssText = "color:#51cf66;font-weight:bold;font-size:13px;margin-right:6px;display:none;";
-  balanceSpan.textContent = "0d";
+  balanceSpan.textContent = "0đ";
   
   var rechargeBtn = document.createElement("button");
   rechargeBtn.className = "login-top";
   rechargeBtn.id = "rechargeBtn";
   rechargeBtn.type = "button";
   rechargeBtn.style.cssText = "border-color:#ff59e8;";
-  rechargeBtn.innerHTML = '💰 <span id="rechargeLabel">Nap tien</span>';
+  rechargeBtn.innerHTML = '💰 <span id="rechargeLabel">Nạp tiền</span>';
   rechargeBtn.onclick = recharge;
   
   var historyBtn = document.createElement("button");
@@ -1235,7 +1251,7 @@ function addNavButtons() {
   historyBtn.id = "historyBtn";
   historyBtn.type = "button";
   historyBtn.style.cssText = "border-color:#3b82f6;";
-  historyBtn.innerHTML = '📋 <span id="historyLabel">Lich su</span>';
+  historyBtn.innerHTML = '📋 <span id="historyLabel">Lịch sử</span>';
   historyBtn.onclick = getUserHistory;
   
   var authBtn = document.getElementById("openLoginBtn");
@@ -1252,9 +1268,7 @@ function addNavButtons() {
 
 document.addEventListener("DOMContentLoaded", function() {
   initUsers();
-  
   filterProducts('all');
-  
   updateAuthUI();
   updateAuthFieldsState();
   addNavButtons();
@@ -1289,7 +1303,4 @@ document.addEventListener("DOMContentLoaded", function() {
   setInterval(function() {
     cleanExpiredCodes();
   }, 30000);
-  
-  console.log("Shop Cua Manh da san sang!");
-  console.log("Tai khoan mac dinh:");
 });

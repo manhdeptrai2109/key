@@ -1,4 +1,11 @@
 // =============================================
+// TAO TAI KHOAN MAC DINH
+// =============================================
+var defaultUsers = [
+  { name: "admin", password: "123" }
+];
+
+// =============================================
 // DU LIEU SAN PHAM (PHAN LOAI THEO THU MUC)
 // =============================================
 var products = [
@@ -127,24 +134,6 @@ function removePendingCode(code) {
   localStorage.setItem("pendingRechargeCodes", JSON.stringify(newPending));
 }
 
-function getTimeLeft(code) {
-  var pending = getPendingCodes();
-  for (var i = 0; i < pending.length; i++) {
-    if (pending[i].code === code) {
-      var left = 600000 - (Date.now() - pending[i].time);
-      return Math.max(0, left);
-    }
-  }
-  return 0;
-}
-
-function formatTimeLeft(ms) {
-  if (ms <= 0) return "0:00";
-  var minutes = Math.floor(ms / 60000);
-  var seconds = Math.floor((ms % 60000) / 1000);
-  return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
-}
-
 // =============================================
 // QUAN LY YEU CAU NAP CHO DUYET
 // =============================================
@@ -162,6 +151,91 @@ function savePendingApprovals(approvals) {
 }
 
 // =============================================
+// CHUC NANG DUYET TIEN CHO ADMIN
+// =============================================
+
+function showAdminPendingList() {
+  var pending = getPendingApprovals();
+  
+  if (pending.length === 0) {
+    showPopup("Quản lý nạp tiền", "Hiện không có yêu cầu nạp tiền nào đang chờ duyệt.", "success");
+    return;
+  }
+
+  var html = '<div style="text-align:left;max-height:380px;overflow-y:auto;padding-right:5px;">';
+  
+  for (var i = 0; i < pending.length; i++) {
+    var req = pending[i];
+    html += '<div style="background:#06082a;padding:12px;margin-bottom:10px;border-radius:10px;border:1px solid #4e3aa2;">';
+    html += '<p style="margin:2px 0;color:#fff;font-size:14px;">👤 <b>Khách hàng:</b> ' + escapeHtml(req.username) + '</p>';
+    html += '<p style="margin:2px 0;color:#ff59e8;font-size:14px;">💰 <b>Số tiền:</b> ' + money(req.amount) + '</p>';
+    html += '<p style="margin:2px 0;color:#ffd43b;font-size:14px;">📌 <b>Mã GD:</b> ' + escapeHtml(req.code) + '</p>';
+    html += '<p style="margin:2px 0;color:#888;font-size:12px;">⏰ <b>Thời gian:</b> ' + req.time + '</p>';
+    html += '<div style="display:flex;gap:8px;margin-top:10px;">';
+    html += '<button onclick="approveRecharge(\'' + req.code + '\')" style="flex:1;padding:8px;background:#16a34a;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;">✅ Duyệt cộng tiền</button>';
+    html += '<button onclick="rejectRecharge(\'' + req.code + '\')" style="flex:1;padding:8px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;">❌ Từ chối</button>';
+    html += '</div></div>';
+  }
+  
+  html += '</div>';
+
+  showPopup("📥 Danh sách chờ duyệt", html, "info");
+}
+
+function approveRecharge(code) {
+  var pending = getPendingApprovals();
+  var reqIndex = -1;
+  
+  for (var i = 0; i < pending.length; i++) {
+    if (pending[i].code === code) {
+      reqIndex = i;
+      break;
+    }
+  }
+
+  if (reqIndex === -1) {
+    showPopup("Lỗi", "Không tìm thấy giao dịch này!", "error");
+    return;
+  }
+
+  var req = pending[reqIndex];
+
+  // 1. Cộng tiền cho khách
+  addUserBalance(req.username, req.amount);
+
+  // 2. Lưu lịch sử nạp
+  var history = getRechargeHistory();
+  history.push({
+    username: req.username,
+    amount: req.amount,
+    code: req.code,
+    time: new Date().toLocaleString('vi-VN'),
+    type: 'recharge'
+  });
+  saveRechargeHistory(history);
+
+  // 3. Xóa yêu cầu khỏi danh sách chờ
+  pending.splice(reqIndex, 1);
+  savePendingApprovals(pending);
+
+  // 4. Thông báo kết quả
+  showPopup("Thành công 🎉", "Đã cộng <b>" + money(req.amount) + "</b> cho <b>" + escapeHtml(req.username) + "</b>", "success", function() {
+    updateBalanceUI();
+    showAdminPendingList();
+  });
+}
+
+function rejectRecharge(code) {
+  var pending = getPendingApprovals();
+  var newPending = pending.filter(function(item) { return item.code !== code; });
+  
+  savePendingApprovals(newPending);
+  showPopup("Đã từ chối", "Đã xóa yêu cầu nạp tiền mã " + escapeHtml(code), "success", function() {
+    showAdminPendingList();
+  });
+}
+
+// =============================================
 // LICH SU NAP TIEN
 // =============================================
 
@@ -175,22 +249,6 @@ function getRechargeHistory() {
 
 function saveRechargeHistory(history) {
   localStorage.setItem('rechargeHistory', JSON.stringify(history));
-}
-
-// =============================================
-// LICH SU TRU TIEN
-// =============================================
-
-function getRemoveHistory() {
-  var data = localStorage.getItem('removeHistory');
-  if (data) {
-    try { return JSON.parse(data); } catch(e) { return []; }
-  }
-  return [];
-}
-
-function saveRemoveHistory(history) {
-  localStorage.setItem('removeHistory', JSON.stringify(history));
 }
 
 // =============================================
@@ -235,7 +293,7 @@ function showPopup(title, message, type, callback) {
   modal.innerHTML = `
     <div style="font-size:48px;margin-bottom:8px;">${icon}</div>
     <h2 style="color:white;margin:0 0 6px;font-size:20px;">${title}</h2>
-    <p style="color:#b0b8e0;margin:0 0 20px;font-size:15px;line-height:1.5;">${message}</p>
+    <div style="color:#b0b8e0;margin:0 0 20px;font-size:15px;line-height:1.5;">${message}</div>
     <div id="popup-buttons" style="display:flex;gap:12px;justify-content:center;"></div>
   `;
 
@@ -259,8 +317,6 @@ function showPopup(title, message, type, callback) {
       cursor:pointer;
       transition:0.3s;
     `;
-    cancelBtn.onmouseover = function() { this.style.background = "rgba(106,63,255,0.2)"; };
-    cancelBtn.onmouseout = function() { this.style.background = "transparent"; };
     cancelBtn.onclick = function() {
       document.body.removeChild(overlay);
       if (callback) callback(false);
@@ -280,8 +336,6 @@ function showPopup(title, message, type, callback) {
       cursor:pointer;
       transition:0.3s;
     `;
-    okBtn.onmouseover = function() { this.style.transform = "scale(1.02)"; };
-    okBtn.onmouseout = function() { this.style.transform = "scale(1)"; };
     okBtn.onclick = function() {
       document.body.removeChild(overlay);
       if (callback) callback(true);
@@ -303,8 +357,6 @@ function showPopup(title, message, type, callback) {
       cursor:pointer;
       transition:0.3s;
     `;
-    okBtn.onmouseover = function() { this.style.transform = "scale(1.02)"; };
-    okBtn.onmouseout = function() { this.style.transform = "scale(1)"; };
     okBtn.onclick = function() {
       document.body.removeChild(overlay);
       if (callback) callback();
@@ -312,17 +364,10 @@ function showPopup(title, message, type, callback) {
 
     btnContainer.appendChild(okBtn);
   }
-
-  var style = document.createElement("style");
-  style.textContent = `
-    @keyframes popupFadeIn { from { opacity:0; } to { opacity:1; } }
-    @keyframes popupScaleIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
-  `;
-  document.head.appendChild(style);
 }
 
 // =============================================
-// XEM LICH SU (CHO NGUOI DUNG)
+// XEM LICH SU GIAO DICH
 // =============================================
 
 function getUserHistory() {
@@ -353,34 +398,17 @@ function getUserHistory() {
     var sign = isRemove ? '' : '+';
     var color = isRemove ? '#ff6b6b' : '#51cf66';
     var label = isRemove ? 'Trừ tiền' : 'Nạp tiền';
-    var codeDisplay = isRemove ? (h.reason || 'Không có lý do') : h.code;
     
     html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a4a;font-size:14px;">';
     html += '<span style="color:#888;font-size:12px;">' + h.time + '</span>';
-    html += '<span style="color:' + color + ';">' + sign + formatMoney(Math.abs(h.amount)) + '</span>';
-    html += '<span style="color:#888;font-size:11px;">' + codeDisplay + '</span>';
+    html += '<span style="color:' + color + ';">' + sign + money(Math.abs(h.amount)) + '</span>';
+    html += '<span style="color:#888;font-size:11px;">' + escapeHtml(h.code || '') + '</span>';
     html += '<span style="font-size:11px;color:#666;">' + label + '</span>';
     html += '</div>';
   }
   html += '</div>';
-  
-  var totalNap = 0;
-  for (var i = 0; i < userHistory.length; i++) {
-    if (userHistory[i].type !== 'remove') {
-      totalNap += userHistory[i].amount;
-    }
-  }
-  
-  html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #4e3aa2;font-weight:bold;color:#ffd43b;">';
-  html += '💰 Tổng đã nạp: ' + formatMoney(totalNap);
-  html += ' | 💳 Số dư hiện tại: ' + formatMoney(getUserBalance(user.name));
-  html += '</div>';
 
   showPopup("📋 Lịch sử giao dịch", html, "success");
-}
-
-function formatMoney(n) {
-  return n.toLocaleString('vi-VN') + 'đ';
 }
 
 // =============================================
@@ -410,8 +438,6 @@ function filterProducts(category) {
   var tabs = document.querySelectorAll('.category-tab');
   for (var i = 0; i < tabs.length; i++) {
     tabs[i].classList.remove('active');
-  }
-  for (var i = 0; i < tabs.length; i++) {
     if (tabs[i].getAttribute('data-category') === category) {
       tabs[i].classList.add('active');
     }
@@ -429,17 +455,6 @@ function filterProducts(category) {
   }
   
   renderProducts(filtered);
-  
-  var titleMap = {
-    'all': 'Tất cả sản phẩm',
-    'dinhvi': '📍 Định vị',
-    'fileaim': '📁 File AIM',
-    'mod': '🎮 Mod'
-  };
-  var titleEl = document.getElementById('categoryTitle');
-  if (titleEl) {
-    titleEl.textContent = titleMap[category] || 'Sản phẩm';
-  }
 }
 
 // =============================================
@@ -448,7 +463,7 @@ function filterProducts(category) {
 
 function productCard(p) {
   return '<article class="product-card">' +
-    '<img class="product-image" src="' + p.image + '" alt="' + escapeHtml(p.name) + '" onerror="this.style.opacity=\'.15\'; this.alt=\'Khong tim thay anh\';">' +
+    '<img class="product-image" src="' + p.image + '" alt="' + escapeHtml(p.name) + '" onerror="this.style.opacity=\'.15\';">' +
     '<div class="product-info">' +
       '<h3 class="product-name">' + escapeHtml(p.name) + '</h3>' +
       '<div class="price">' + money(p.price) + '</div>' +
@@ -480,7 +495,7 @@ function renderProducts(list) {
 }
 
 // =============================================
-// TIM KIEM
+// TIM KIEM SAN PHAM
 // =============================================
 
 function searchProducts() {
@@ -489,27 +504,19 @@ function searchProducts() {
   var q = input.value.trim().toLowerCase();
   var result = [];
   
-  if (currentCategory === 'all') {
-    for (var i = 0; i < products.length; i++) {
-      if (products[i].name.toLowerCase().includes(q)) {
-        result.push(products[i]);
-      }
-    }
-  } else {
-    for (var i = 0; i < products.length; i++) {
-      if (products[i].category === currentCategory && products[i].name.toLowerCase().includes(q)) {
-        result.push(products[i]);
-      }
+  for (var i = 0; i < products.length; i++) {
+    var matchCategory = (currentCategory === 'all' || products[i].category === currentCategory);
+    var matchName = products[i].name.toLowerCase().includes(q);
+    if (matchCategory && matchName) {
+      result.push(products[i]);
     }
   }
   
   renderProducts(result);
-  var noProducts = $("noProducts");
-  if (noProducts) noProducts.hidden = (result.length > 0);
 }
 
 // =============================================
-// MUA NGAY (DUNG SO DU + TU DONG MO FILE)
+// MUA NGAY
 // =============================================
 
 function buyNow(productId) {
@@ -528,7 +535,7 @@ function buyNow(productId) {
   if (balance < product.price) {
     showPopup(
       "⚠️ Số dư không đủ!",
-      "Bạn cần <strong style='color:#ff59e8;'>" + money(product.price) + "</strong> để mua sản phẩm này.<br>💰 Số dư hiện tại: <strong style='color:#51cf66;'>" + money(balance) + "</strong><br><br>Vui lòng nạp thêm tiền vào ví.",
+      "Bạn cần <strong style='color:#ff59e8;'>" + money(product.price) + "</strong> để mua sản phẩm này.<br>💰 Số dư hiện tại: <strong style='color:#51cf66;'>" + money(balance) + "</strong>",
       "error"
     );
     return;
@@ -536,7 +543,7 @@ function buyNow(productId) {
 
   showPopup(
     "Xác nhận mua hàng",
-    "Bạn có chắc muốn mua <strong>" + product.name + "</strong> với giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong>?<br><br>💰 Số dư hiện tại: <strong style='color:#51cf66;'>" + money(balance) + "</strong>",
+    "Bạn có chắc muốn mua <strong>" + escapeHtml(product.name) + "</strong> giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong>?",
     "confirm",
     function(result) {
       if (result) {
@@ -544,17 +551,15 @@ function buyNow(productId) {
         setUserBalance(user.name, newBalance);
         updateBalanceUI();
         
-        var fileUrl = product.fileUrl || null;
-        
         showPopup(
           "🎉 Mua hàng thành công!",
-          "Bạn đã mua <strong>" + product.name + "</strong> với giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong><br><br>💰 Số dư còn lại: <strong style='color:#51cf66;'>" + money(newBalance) + "</strong><br><br>📥 Nhấn OK để tải file!",
+          "Đã thanh toán thành công!<br>📥 Nhấn OK để tải file.",
           "success",
           function() {
-            if (fileUrl) {
-              window.open(fileUrl, '_blank');
+            if (product.fileUrl) {
+              window.open(product.fileUrl, '_blank');
             } else {
-              showPopup("Thông báo", "Sản phẩm này chưa có link tải. Vui lòng liên hệ admin!", "error");
+              showPopup("Thông báo", "Sản phẩm chưa có file liên kết. Vui lòng liên hệ Admin!", "error");
             }
           }
         );
@@ -564,7 +569,7 @@ function buyNow(productId) {
 }
 
 // =============================================
-// POPUP NAP TIEN
+// POPUP NAP TIEN (GIAO DIEN THANH TOAN)
 // =============================================
 
 function showRechargePopup(rechargeCode, amount) {
@@ -574,33 +579,17 @@ function showRechargePopup(rechargeCode, amount) {
   var overlay = document.createElement("div");
   overlay.className = "custom-popup-overlay";
   overlay.style.cssText = `
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 99999;
-    backdrop-filter: blur(10px);
-    animation: popupFadeIn 0.3s ease;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 99999; backdrop-filter: blur(10px);
   `;
 
   var modal = document.createElement("div");
   modal.style.cssText = `
     background: linear-gradient(145deg, #0b0d3b, #03051d);
-    border: 1px solid #833cff;
-    border-radius: 20px;
-    padding: 22px 22px 28px;
-    max-width: 420px;
-    width: 94%;
-    text-align: center;
-    box-shadow: 0 0 50px rgba(112,30,255,0.5);
-    animation: popupScaleIn 0.3s ease;
-    max-height: 95vh;
-    overflow-y: auto;
+    border: 1px solid #833cff; border-radius: 20px;
+    padding: 22px; max-width: 420px; width: 94%; text-align: center;
   `;
-
-  var timerId = "timer_" + rechargeCode;
 
   modal.innerHTML = `
     <div style="font-size:36px;margin-bottom:4px;">💰</div>
@@ -608,138 +597,49 @@ function showRechargePopup(rechargeCode, amount) {
     <p style="color:#b0b8e0;margin:0 0 14px;font-size:13px;">Quét mã QR để chuyển khoản</p>
 
     <div style="background:#06082a;padding:14px;border-radius:12px;border:1px solid #4e3aa2;margin-bottom:14px;">
-      <p style="font-size:11px;color:#888;margin:0 0 8px;">📱 Quét mã QR</p>
-      <img src="images/manganhang.jpg" alt="Mã QR chuyển khoản" 
-        style="width:100%;max-width:200px;height:auto;border-radius:10px;display:block;margin:0 auto;border:1px solid #4e3aa2;"
-        onerror="this.style.display='none'; this.parentNode.innerHTML='<p style=\\'color:#ff6b6b;font-size:13px;margin:10px;\\'>⚠️ Chưa có ảnh QR<br><span style=\\'font-size:11px;color:#888;\\'>Vui lòng thêm images/manganhang.jpg</span></p>';">
+      <img src="images/manganhang.jpg" alt="Mã QR" style="width:100%;max-width:200px;border-radius:10px;display:block;margin:0 auto;">
     </div>
 
-    <div style="margin:0 0 12px;text-align:left;background:#06082a;padding:12px 14px;border-radius:12px;border:1px solid #4e3aa2;">
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💳 Ngân hàng:</strong> MB Bank</p>
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">🔢 Số tài khoản:</strong> 08122261152109</p>
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">👤 Chủ tài khoản:</strong> PHAM TIEN MANH</p>
-      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💰 Số tiền:</strong> <span style="color:#ff59e8;font-size:18px;font-weight:bold;">${money(amount)}</span></p>
+    <div style="margin:0 0 12px;text-align:left;background:#06082a;padding:12px;border-radius:12px;border:1px solid #4e3aa2;font-size:13px;color:#b0b8e0;">
+      <p style="margin:2px 0;">💳 <b>Ngân hàng:</b> MB Bank</p>
+      <p style="margin:2px 0;">🔢 <b>STK:</b> 08122261152109</p>
+      <p style="margin:2px 0;">👤 <b>Chủ TK:</b> PHAM TIEN MANH</p>
+      <p style="margin:2px 0;">💰 <b>Số tiền:</b> <span style="color:#ff59e8;font-size:16px;font-weight:bold;">${money(amount)}</span></p>
     </div>
 
     <div style="margin:0 0 14px;padding:12px;background:#fff3cd;border-radius:12px;border:2px solid #ffc107;">
       <p style="color:#856404;font-weight:bold;margin:0 0 4px;font-size:13px;">📌 Nội dung chuyển khoản:</p>
-      <p style="font-size:18px;font-weight:bold;color:#d63384;margin:0;word-break:break-all;user-select:all;letter-spacing:1px;">${rechargeCode}</p>
-      <p style="margin:6px 0 0;font-size:13px;color:#888;">
-        ⏰ Còn <strong style="color:#ffd43b;font-size:16px;" id="${timerId}">10:00</strong> phút để chuyển khoản
-      </p>
+      <p style="font-size:18px;font-weight:bold;color:#d63384;margin:0;">${rechargeCode}</p>
     </div>
 
-    <button onclick="copyContent('${rechargeCode}')" 
-      style="width:100%;padding:10px;background:linear-gradient(135deg,#0d6efd,#0b5ed7);color:white;border:none;border-radius:12px;font-size:14px;font-weight:bold;cursor:pointer;margin-bottom:8px;transition:0.3s;">
-      📋 Copy nội dung chuyển khoản
+    <button onclick="copyContent('${rechargeCode}')" style="width:100%;padding:10px;background:#0d6efd;color:white;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-bottom:8px;">
+      📋 Copy nội dung CK
     </button>
-
-    <button onclick="completeRecharge('${rechargeCode}', ${amount})" 
-      style="width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:12px;font-size:15px;font-weight:bold;cursor:pointer;transition:0.3s;">
+    <button onclick="completeRecharge('${rechargeCode}', ${amount})" style="width:100%;padding:12px;background:#16a34a;color:white;border:none;border-radius:12px;font-size:15px;font-weight:bold;cursor:pointer;">
       ✅ Tôi đã chuyển khoản
-    </button>
-
-    <button onclick="closePaymentPopup(this)" 
-      style="width:100%;margin-top:6px;padding:8px;background:transparent;color:#888;border:1px solid #4e3aa2;border-radius:12px;font-size:13px;cursor:pointer;transition:0.3s;">
-      ❌ Đóng
     </button>
   `;
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
-
-  var timerElement = document.getElementById(timerId);
-  if (timerElement) {
-    var pending = getPendingCodes();
-    var createdTime = 0;
-    for (var i = 0; i < pending.length; i++) {
-      if (pending[i].code === rechargeCode) {
-        createdTime = pending[i].time;
-        break;
-      }
-    }
-
-    function updateTimer() {
-      var left = Math.max(0, 600000 - (Date.now() - createdTime));
-      
-      if (left <= 0) {
-        timerElement.textContent = "0:00";
-        timerElement.style.color = "#ff6b6b";
-        setTimeout(function() {
-          var popup = document.querySelector(".custom-popup-overlay");
-          if (popup) {
-            showPopup("⏰ Hết thời gian!", "Mã nạp <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> đã hết hiệu lực.<br><br>Vui lòng tạo mã mới để nạp tiền.", "error");
-            document.body.removeChild(popup);
-          }
-        }, 500);
-        return;
-      }
-      
-      var minutes = Math.floor(left / 60000);
-      var seconds = Math.floor((left % 60000) / 1000);
-      timerElement.textContent = minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
-      
-      timerElement.style.color = left < 60000 ? "#ff6b6b" : "#ffd43b";
-      
-      requestAnimationFrame(updateTimer);
-    }
-    
-    updateTimer();
-  }
-
-  overlay.onclick = function(e) {
-    if (e.target === overlay) {
-      document.body.removeChild(overlay);
-    }
-  };
-}
-
-function closePaymentPopup(btn) {
-  var overlay = btn.closest(".custom-popup-overlay");
-  if (overlay) document.body.removeChild(overlay);
 }
 
 function copyContent(text) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(function() {
-      showPopup("✅ Đã copy!", "Nội dung chuyển khoản đã được sao chép.", "success");
-    }).catch(function() {
-      fallbackCopy(text);
-    });
-  } else {
-    fallbackCopy(text);
-  }
-}
-
-function fallbackCopy(text) {
-  var textArea = document.createElement("textarea");
-  textArea.value = text;
-  textArea.style.position = "fixed";
-  textArea.style.opacity = "0";
-  document.body.appendChild(textArea);
-  textArea.select();
-  try {
-    document.execCommand("copy");
-    showPopup("✅ Đã copy!", "Nội dung chuyển khoản đã được sao chép.", "success");
-  } catch (err) {
-    showPopup("❌ Lỗi!", "Không thể copy, vui lòng copy thủ công.", "error");
-  }
-  document.body.removeChild(textArea);
+  navigator.clipboard.writeText(text).then(function() {
+    showPopup("✅ Đã copy!", "Nội dung chuyển khoản đã được chép.", "success");
+  });
 }
 
 // =============================================
-// XAC NHAN NAP TIEN (CHO ADMIN DUYET)
+// XAC NHAN NAP TIEN (GUI YEU CAU TOI ADMIN)
 // =============================================
 
 function completeRecharge(rechargeCode, amount) {
   var user = currentUser();
-  if (!user) {
-    showPopup("Lỗi", "Vui lòng đăng nhập!", "error");
-    return;
-  }
+  if (!user) return;
 
   if (!isCodeValid(rechargeCode)) {
-    showPopup("⚠️ Mã đã hết hạn!", "Mã nạp tiền <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> đã hết hiệu lực sau 10 phút.<br><br>Vui lòng tạo mã mới để nạp tiền.", "error");
+    showPopup("⚠️ Mã đã hết hạn!", "Mã nạp tiền đã hết hiệu lực. Vui lòng tạo mã mới.", "error");
     return;
   }
 
@@ -754,22 +654,21 @@ function completeRecharge(rechargeCode, amount) {
     time: new Date().toLocaleString('vi-VN'),
     status: 'pending'
   });
-  localStorage.setItem('pendingApprovals', JSON.stringify(pendingApprovals));
+  savePendingApprovals(pendingApprovals);
 
   showPopup(
-    "⏳ Chờ admin xác nhận!",
-    "Bạn đã gửi yêu cầu nạp <strong style='color:#ff59e8;'>" + money(amount) + "</strong>.<br><br>📌 Mã giao dịch: <strong style='color:#ffd43b;'>" + rechargeCode + "</strong><br><br>⏳ Vui lòng đợi admin xác nhận chuyển khoản.<br>💰 Số dư sẽ được cập nhật sau khi admin duyệt.",
+    "⏳ Đã gửi yêu cầu!",
+    "Yêu cầu nạp <b>" + money(amount) + "</b> với mã <b>" + rechargeCode + "</b> đã được gửi.<br>Vui lòng chờ Admin xác nhận!",
     "success"
   );
 }
 
 // =============================================
-// HE THONG DANG NHAP
+// HE THONG DANG NHAP / DANG KY
 // =============================================
 
 function initUsers() {
   if (!localStorage.getItem("shopCuaManhUsers")) {
-    var defaultUsers = [{ name: "admin", password: "123" }];
     localStorage.setItem("shopCuaManhUsers", JSON.stringify(defaultUsers));
   }
 }
@@ -802,138 +701,61 @@ function removeCurrentUser() {
   localStorage.removeItem("shopCuaManhCurrentUser");
 }
 
-// =============================================
-// CAP NHAT SO DU TREN HEADER
-// =============================================
-
 function updateBalanceUI() {
   var balanceEl = document.getElementById("userBalance");
-  if (!balanceEl) {
-    var navActions = document.querySelector(".nav-actions");
-    if (navActions) {
-      var authBtn = document.getElementById("openLoginBtn");
-      if (authBtn) {
-        balanceEl = document.createElement("span");
-        balanceEl.id = "userBalance";
-        balanceEl.style.cssText = "color:#51cf66;font-weight:bold;font-size:13px;margin-right:6px;display:none;";
-        balanceEl.textContent = "0đ";
-        navActions.insertBefore(balanceEl, authBtn);
-      }
-    }
-  }
-  
-  if (!balanceEl) return;
-  
   var user = currentUser();
-  if (user) {
-    var balance = getUserBalance(user.name);
-    balanceEl.textContent = money(balance);
+  if (balanceEl && user) {
+    balanceEl.textContent = money(getUserBalance(user.name));
     balanceEl.style.display = "inline";
-  } else {
+  } else if (balanceEl) {
     balanceEl.style.display = "none";
   }
 }
 
-// =============================================
-// NAP TIEN
-// =============================================
-
 function recharge() {
   var user = currentUser();
   if (!user) {
-    showPopup("Thông báo", "Vui lòng đăng nhập để nạp tiền!", "error", function() {
-      openLogin();
-    });
+    showPopup("Thông báo", "Vui lòng đăng nhập để nạp tiền!", "error", function() { openLogin(); });
     return;
   }
-
   showRechargeOptions();
 }
 
 function showRechargeOptions() {
-  var user = currentUser();
-  if (!user) return;
-
   var amounts = [10000, 20000, 50000, 100000, 200000, 500000];
-  
   var overlay = document.createElement("div");
   overlay.className = "custom-popup-overlay";
-  overlay.style.cssText = `
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 99999;
-    backdrop-filter: blur(8px);
-    animation: popupFadeIn 0.3s ease;
-  `;
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:99999;";
 
   var modal = document.createElement("div");
-  modal.style.cssText = `
-    background: linear-gradient(145deg, #0b0d3b, #03051d);
-    border: 1px solid #833cff;
-    border-radius: 20px;
-    padding: 24px;
-    max-width: 420px;
-    width: 92%;
-    text-align: center;
-    box-shadow: 0 0 50px rgba(112,30,255,0.5);
-    animation: popupScaleIn 0.3s ease;
-  `;
+  modal.style.cssText = "background:#0b0d3b;border:1px solid #833cff;border-radius:20px;padding:24px;max-width:420px;width:92%;text-align:center;";
 
-  var html = '<div style="font-size:40px;margin-bottom:6px;">💰</div>';
-  html += '<h2 style="color:white;margin:0 0 4px;font-size:20px;">Chọn số tiền nạp</h2>';
-  html += '<p style="color:#b0b8e0;margin:0 0 16px;font-size:13px;">Chọn mức tiền bạn muốn nạp vào ví</p>';
+  var html = '<h2 style="color:white;margin-bottom:12px;">Chọn số tiền nạp</h2>';
   html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
-  
   for (var i = 0; i < amounts.length; i++) {
-    html += '<button onclick="selectRechargeAmount(' + amounts[i] + ')" style="';
-    html += 'padding:12px;background:linear-gradient(135deg,#6a3fff,#a855f7);border:none;border-radius:12px;color:white;font-size:15px;font-weight:bold;cursor:pointer;transition:0.3s;';
-    html += '" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">';
-    html += money(amounts[i]);
-    html += '</button>';
+    html += '<button onclick="selectRechargeAmount(' + amounts[i] + ')" style="padding:12px;background:#6a3fff;border:none;border-radius:12px;color:white;font-weight:bold;cursor:pointer;">' + money(amounts[i]) + '</button>';
   }
-  
   html += '</div>';
-  html += '<button onclick="closePopupOverlay(this)" style="';
-  html += 'width:100%;padding:10px;background:transparent;color:#888;border:1px solid #4e3aa2;border-radius:12px;font-size:14px;cursor:pointer;';
-  html += '">❌ Đóng</button>';
 
   modal.innerHTML = html;
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  overlay.onclick = function(e) {
-    if (e.target === overlay) {
-      document.body.removeChild(overlay);
-    }
-  };
-}
-
-function closePopupOverlay(btn) {
-  var overlay = btn.closest(".custom-popup-overlay");
-  if (overlay) document.body.removeChild(overlay);
+  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
 }
 
 function selectRechargeAmount(amount) {
   var overlay = document.querySelector(".custom-popup-overlay");
   if (overlay) document.body.removeChild(overlay);
 
-  var user = currentUser();
-  if (!user) return;
-
   cleanExpiredCodes();
-
   var rechargeCode = generateRechargeCode();
   savePendingCode(rechargeCode, amount);
-  
   showRechargePopup(rechargeCode, amount);
 }
 
 // =============================================
-// DANG NHAP / DANG KY - UI
+// XU LY UI AUTHCATION & FORM
 // =============================================
 
 var loginModal = $("loginModal");
@@ -959,44 +781,44 @@ var logoutBtn = $("logoutBtn");
 var registerMode = false;
 
 function updateAuthFieldsState() {
-  if (loginNameInput) loginNameInput.disabled = registerMode;
-  if (loginPasswordInput) loginPasswordInput.disabled = registerMode;
-  if (registerNameInput) registerNameInput.disabled = !registerMode;
-  if (registerPasswordInput) registerPasswordInput.disabled = !registerMode;
-  if (registerConfirmInput) registerConfirmInput.disabled = !registerMode;
+  if (!loginNameInput) return;
+  loginNameInput.disabled = registerMode;
+  loginPasswordInput.disabled = registerMode;
+  registerNameInput.disabled = !registerMode;
+  registerPasswordInput.disabled = !registerMode;
+  registerConfirmInput.disabled = !registerMode;
 }
 
 function openLogin() {
   if (!loginModal) return;
   var user = currentUser();
   if (user) {
-    if (authForm) authForm.hidden = true;
+    authForm.hidden = true;
     if (switchAuthBtn) switchAuthBtn.hidden = true;
     if (logoutBtn) logoutBtn.hidden = false;
-    if (loginFields) loginFields.hidden = true;
-    if (registerFields) registerFields.hidden = true;
-    if (authMessage) {
-      authMessage.textContent = "Xin chào: " + user.name;
-      authMessage.style.color = "#ffd43b";
-    }
+    loginFields.hidden = true;
+    registerFields.hidden = true;
+    authMessage.textContent = "Xin chào: " + user.name;
+    authMessage.style.color = "#ffd43b";
   } else {
-    if (authForm) authForm.hidden = false;
+    authForm.hidden = false;
     if (switchAuthBtn) switchAuthBtn.hidden = false;
     if (logoutBtn) logoutBtn.hidden = true;
-    if (loginFields) loginFields.hidden = registerMode;
-    if (registerFields) registerFields.hidden = !registerMode;
-    if (authMessage) authMessage.textContent = "";
+    loginFields.hidden = registerMode;
+    registerFields.hidden = !registerMode;
+    authMessage.textContent = "";
   }
-  loginModal.setAttribute("aria-hidden", "false");
   loginModal.classList.add("open");
 }
 
 function closeLogin() {
   if (!loginModal) return;
-  loginModal.setAttribute("aria-hidden", "true");
   loginModal.classList.remove("open");
   if (authMessage) authMessage.textContent = "";
-  if (authForm) authForm.hidden = false;
+  if (authForm) {
+    authForm.hidden = false;
+    authForm.reset();
+  }
   if (switchAuthBtn) switchAuthBtn.hidden = false;
   if (logoutBtn) logoutBtn.hidden = true;
   updateAuthFieldsState();
@@ -1005,23 +827,14 @@ function closeLogin() {
 function updateAuthUI() {
   var user = currentUser();
 
-  if (loginLabel) {
-    loginLabel.textContent = user ? user.name : "Đăng nhập";
-  }
-
+  if (loginLabel) loginLabel.textContent = user ? user.name : "Đăng nhập";
   if (authTitle) authTitle.textContent = registerMode ? "Tạo tài khoản" : "Đăng nhập";
-  if (authSubtitle) {
-    authSubtitle.textContent = registerMode
-      ? "Tạo tài khoản để lưu thông tin mua hàng"
-      : "Đăng nhập để tiếp tục mua hàng";
-  }
   if (authSubmit) authSubmit.textContent = registerMode ? "Đăng ký" : "Đăng nhập";
   if (loginFields) loginFields.hidden = registerMode;
   if (registerFields) registerFields.hidden = !registerMode;
+  
   if (switchAuthBtn) {
-    switchAuthBtn.innerHTML = registerMode
-      ? 'Đã có tài khoản? <b>Đăng nhập</b>'
-      : 'Chưa có tài khoản? <b>Đăng ký</b>';
+    switchAuthBtn.innerHTML = registerMode ? 'Đã có tài khoản? <b>Đăng nhập</b>' : 'Chưa có tài khoản? <b>Đăng ký</b>';
   }
 
   updateAuthFieldsState();
@@ -1035,12 +848,10 @@ if (closeLoginBackdrop) closeLoginBackdrop.addEventListener("click", closeLogin)
 if (switchAuthBtn) {
   switchAuthBtn.addEventListener("click", function() {
     registerMode = !registerMode;
-    if (authMessage) authMessage.textContent = "";
-    if (authForm) {
-      authForm.hidden = false;
-      authForm.reset();
-    }
+    authMessage.textContent = "";
+    authForm.hidden = false;
     if (logoutBtn) logoutBtn.hidden = true;
+    authForm.reset();
     updateAuthUI();
   });
 }
@@ -1059,13 +870,8 @@ if (authForm) {
         authMessage.style.color = "#ff6b6b";
         return;
       }
-      if (password.length < 4) {
-        authMessage.textContent = "Mật khẩu phải có ít nhất 4 ký tự.";
-        authMessage.style.color = "#ff6b6b";
-        return;
-      }
       if (password !== confirm) {
-        authMessage.textContent = "Mật khẩu xác minh không khớp!";
+        authMessage.textContent = "Mật khẩu không khớp!";
         authMessage.style.color = "#ff6b6b";
         return;
       }
@@ -1073,7 +879,7 @@ if (authForm) {
       var users = getUsers();
       for (var i = 0; i < users.length; i++) {
         if (users[i].name.toLowerCase() === name.toLowerCase()) {
-          authMessage.textContent = "Tên hiển thị này đã tồn tại.";
+          authMessage.textContent = "Tên tài khoản này đã tồn tại.";
           authMessage.style.color = "#ff6b6b";
           return;
         }
@@ -1081,257 +887,102 @@ if (authForm) {
 
       users.push({ name: name, password: password });
       saveUsers(users);
-      
-      if (!localStorage.getItem("shopCuaManhBalance_" + name)) {
-        setUserBalance(name, 0);
-      }
+      setUserBalance(name, 0);
 
       registerMode = false;
-      loginNameInput.value = name;
-      loginPasswordInput.value = "";
-      registerNameInput.value = "";
-      registerPasswordInput.value = "";
-      registerConfirmInput.value = "";
-
-      authMessage.textContent = "Đăng ký thành công! Hãy nhập mật khẩu để đăng nhập.";
+      authMessage.textContent = "Đăng ký thành công! Vui lòng đăng nhập.";
       authMessage.style.color = "#51cf66";
       updateAuthUI();
-
-      setTimeout(function() {
-        if (loginPasswordInput) loginPasswordInput.focus();
-      }, 100);
     } else {
       var name = loginNameInput.value.trim();
       var password = loginPasswordInput.value;
 
-      if (!name || !password) {
-        authMessage.textContent = "Vui lòng nhập tên hiển thị và mật khẩu.";
-        authMessage.style.color = "#ff6b6b";
-        return;
-      }
-
       var users = getUsers();
       var user = null;
       for (var i = 0; i < users.length; i++) {
-        if (users[i].name.toLowerCase() === name.toLowerCase() &&
-            users[i].password === password) {
+        if (users[i].name.toLowerCase() === name.toLowerCase() && users[i].password === password) {
           user = users[i];
           break;
         }
       }
 
       if (!user) {
-        authMessage.textContent = "Sai tên hiển thị hoặc mật khẩu.";
+        authMessage.textContent = "Sai tên đăng nhập hoặc mật khẩu.";
         authMessage.style.color = "#ff6b6b";
         return;
       }
 
       setCurrentUser({ name: user.name });
-      authMessage.textContent = "Đăng nhập thành công!";
-      authMessage.style.color = "#51cf66";
       updateAuthUI();
-
-      setTimeout(function() {
-        closeLogin();
-        authForm.reset();
-        showPopup("Chào mừng! 🎉", "Chào mừng <strong>" + user.name + "</strong> quay trở lại!", "success");
-      }, 500);
+      closeLogin();
+      showPopup("Thành công", "Chào mừng " + user.name + " đã đăng nhập!", "success");
     }
   });
 }
 
 if (logoutBtn) {
   logoutBtn.addEventListener("click", function() {
-    showPopup("Xác nhận đăng xuất", "Bạn có chắc muốn đăng xuất?", "confirm", function(result) {
-      if (result) {
-        removeCurrentUser();
-        if (authForm) {
-          authForm.hidden = false;
-          authForm.reset();
-        }
-        if (switchAuthBtn) switchAuthBtn.hidden = false;
-        logoutBtn.hidden = true;
-        registerMode = false;
-        if (authMessage) {
-          authMessage.textContent = "Đã đăng xuất.";
-          authMessage.style.color = "#ffd43b";
-        }
-        updateAuthUI();
-        showPopup("Đã đăng xuất", "Bạn đã đăng xuất thành công!", "success");
-      }
-    });
+    removeCurrentUser();
+    updateAuthUI();
+    closeLogin();
+    showPopup("Thông báo", "Đã đăng xuất thành công!", "success");
   });
 }
 
 // =============================================
-// MODAL LIEN HE
-// =============================================
-
-function openContact() {
-  var modal = document.getElementById('contactModal');
-  if (modal) {
-    modal.classList.add('open');
-    modal.setAttribute('aria-hidden', 'false');
-  }
-  return false;
-}
-
-function closeContact() {
-  var modal = document.getElementById('contactModal');
-  if (modal) {
-    modal.classList.remove('open');
-    modal.setAttribute('aria-hidden', 'true');
-  }
-}
-
-// =============================================
-// HIEU UNG MUA
-// =============================================
-
-var canvas = $("rainCanvas");
-if (canvas) {
-  var ctx = canvas.getContext("2d");
-  var drops = [];
-  var w = window.innerWidth, h = window.innerHeight;
-  canvas.width = w; canvas.height = h;
-  for (var i = 0; i < 120; i++) {
-    drops.push({ x: Math.random() * w, y: Math.random() * h, speed: 3 + Math.random() * 5, len: 10 + Math.random() * 15, opacity: 0.1 + Math.random() * 0.3 });
-  }
-  function drawRain() {
-    ctx.clearRect(0, 0, w, h);
-    for (var i = 0; i < drops.length; i++) {
-      var d = drops[i];
-      ctx.beginPath();
-      ctx.moveTo(d.x, d.y);
-      ctx.lineTo(d.x - 2, d.y + d.len);
-      ctx.strokeStyle = "rgba(130,185,255," + d.opacity + ")";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      d.y += d.speed;
-      if (d.y > h) { d.y = -d.len; d.x = Math.random() * w; }
-    }
-    requestAnimationFrame(drawRain);
-  }
-  drawRain();
-  window.addEventListener("resize", function() {
-    w = window.innerWidth; h = window.innerHeight;
-    canvas.width = w; canvas.height = h;
-  });
-}
-
-// =============================================
-// THEM NUT NAP TIEN + LICH SU + SO DU
+// NOIDUNG HEADER DANG BUTTONS
 // =============================================
 
 function addNavButtons() {
   var navActions = document.querySelector(".nav-actions");
   if (!navActions) return;
-  
+
   if (document.getElementById("rechargeBtn")) return;
-  
+
   var balanceSpan = document.createElement("span");
   balanceSpan.id = "userBalance";
   balanceSpan.style.cssText = "color:#51cf66;font-weight:bold;font-size:13px;margin-right:6px;display:none;";
-  balanceSpan.textContent = "0đ";
-  
+
   var rechargeBtn = document.createElement("button");
   rechargeBtn.className = "login-top";
   rechargeBtn.id = "rechargeBtn";
-  rechargeBtn.type = "button";
-  rechargeBtn.style.cssText = "border-color:#ff59e8;";
-  rechargeBtn.innerHTML = '💰 <span id="rechargeLabel">Nạp tiền</span>';
+  rechargeBtn.innerHTML = '💰 Nạp tiền';
   rechargeBtn.onclick = recharge;
-  
+
   var historyBtn = document.createElement("button");
   historyBtn.className = "login-top";
   historyBtn.id = "historyBtn";
-  historyBtn.type = "button";
-  historyBtn.style.cssText = "border-color:#3b82f6;";
-  historyBtn.innerHTML = '📋 <span id="historyLabel">Lịch sử</span>';
+  historyBtn.innerHTML = '📋 Lịch sử';
   historyBtn.onclick = getUserHistory;
-  
+
+  var adminBtn = document.createElement("button");
+  adminBtn.className = "login-top";
+  adminBtn.id = "adminBtn";
+  adminBtn.style.cssText = "border-color:#ff4757;color:#ff4757;";
+  adminBtn.innerHTML = '👑 Admin Duyệt';
+  adminBtn.onclick = showAdminPendingList;
+
   var authBtn = document.getElementById("openLoginBtn");
   if (authBtn) {
     navActions.insertBefore(balanceSpan, authBtn);
     navActions.insertBefore(rechargeBtn, authBtn);
     navActions.insertBefore(historyBtn, authBtn);
+    navActions.insertBefore(adminBtn, authBtn);
   }
 }
 
 // =============================================
-// KHOI CHAY
+// KHOI CHAY UNG DUNG
 // =============================================
 
 document.addEventListener("DOMContentLoaded", function() {
   initUsers();
   filterProducts('all');
-  updateAuthUI();
-  updateAuthFieldsState();
   addNavButtons();
-  
-  setTimeout(function() {
-    updateBalanceUI();
-  }, 100);
-  
+  updateAuthUI();
+
   var searchInput = $("searchInput");
-  var searchBtn = $("searchBtn");
   if (searchInput) searchInput.addEventListener("input", searchProducts);
-  if (searchBtn) searchBtn.addEventListener("click", searchProducts);
-  
-  var closeContactBtn = document.getElementById('closeContactBtn');
-  var closeContactBackdrop = document.getElementById('closeContactBackdrop');
-  if (closeContactBtn) {
-    closeContactBtn.addEventListener('click', closeContact);
-  }
-  if (closeContactBackdrop) {
-    closeContactBackdrop.addEventListener('click', closeContact);
-  }
-  
-  document.addEventListener("keydown", function(e) {
-    if (e.key === "Escape") {
-      closeLogin();
-      closeContact();
-      var popup = document.querySelector(".custom-popup-overlay");
-      if (popup) document.body.removeChild(popup);
-    }
-  });
-  
-  setInterval(function() {
-    cleanExpiredCodes();
-  }, 30000);
+
+  setInterval(cleanExpiredCodes, 30000);
 });
-
-// =============================================
-// BAO VE WEBSITE: CHAN F12, CHUOT PHAI, DEVTOOLS
-// =============================================
-
-// 1. Chặn F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
-document.addEventListener("keydown", function (e) {
-  if (
-    e.key === "F12" ||
-    (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) ||
-    (e.ctrlKey && (e.key === "U" || e.key === "u" || e.key === "S" || e.key === "s"))
-  ) {
-    e.preventDefault();
-    e.stopPropagation();
-    return false;
-  }
-});
-
-// 2. Chặn menu chuột phải (ContextMenu)
-document.addEventListener("contextmenu", function (e) {
-  e.preventDefault();
-  return false;
-});
-
-// 3. Vòng lặp Debugger (Treo/Giật lag trang nếu cố tình mở DevTools)
-setInterval(function () {
-  var startTime = performance.now();
-  (function () {
-    debugger;
-  })();
-  var endTime = performance.now();
-  if (endTime - startTime > 100) {
-    document.body.innerHTML = "<h1 style='color:white;text-align:center;margin-top:20%;font-family:sans-serif;'>Hành vi bị cấm! DevTools đã bị vô hiệu hóa.</h1>";
-  }
-}, 500);

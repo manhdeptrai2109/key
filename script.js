@@ -1,11 +1,4 @@
 // =============================================
-// TAO TAI KHOAN MAC DINH
-// =============================================
-var defaultUsers = [
-  { name: "admin", password: "123" }
-];
-
-// =============================================
 // DU LIEU SAN PHAM (PHAN LOAI THEO THU MUC)
 // =============================================
 var products = [
@@ -30,7 +23,7 @@ var products = [
 ];
 
 function $(id) { return document.getElementById(id); }
-function money(n) { return n.toLocaleString("vi-VN") + "đ"; }
+function money(n) { return n.toLocaleString("vi-VN") + "d"; }
 
 function getProduct(id) {
   for (var i = 0; i < products.length; i++) {
@@ -134,6 +127,24 @@ function removePendingCode(code) {
   localStorage.setItem("pendingRechargeCodes", JSON.stringify(newPending));
 }
 
+function getTimeLeft(code) {
+  var pending = getPendingCodes();
+  for (var i = 0; i < pending.length; i++) {
+    if (pending[i].code === code) {
+      var left = 600000 - (Date.now() - pending[i].time);
+      return Math.max(0, left);
+    }
+  }
+  return 0;
+}
+
+function formatTimeLeft(ms) {
+  if (ms <= 0) return "0:00";
+  var minutes = Math.floor(ms / 60000);
+  var seconds = Math.floor((ms % 60000) / 1000);
+  return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+}
+
 // =============================================
 // QUAN LY YEU CAU NAP CHO DUYET
 // =============================================
@@ -151,91 +162,6 @@ function savePendingApprovals(approvals) {
 }
 
 // =============================================
-// CHUC NANG DUYET TIEN CHO ADMIN
-// =============================================
-
-function showAdminPendingList() {
-  var pending = getPendingApprovals();
-  
-  if (pending.length === 0) {
-    showPopup("Quản lý nạp tiền", "Hiện không có yêu cầu nạp tiền nào đang chờ duyệt.", "success");
-    return;
-  }
-
-  var html = '<div style="text-align:left;max-height:380px;overflow-y:auto;padding-right:5px;">';
-  
-  for (var i = 0; i < pending.length; i++) {
-    var req = pending[i];
-    html += '<div style="background:#06082a;padding:12px;margin-bottom:10px;border-radius:10px;border:1px solid #4e3aa2;">';
-    html += '<p style="margin:2px 0;color:#fff;font-size:14px;">👤 <b>Khách hàng:</b> ' + escapeHtml(req.username) + '</p>';
-    html += '<p style="margin:2px 0;color:#ff59e8;font-size:14px;">💰 <b>Số tiền:</b> ' + money(req.amount) + '</p>';
-    html += '<p style="margin:2px 0;color:#ffd43b;font-size:14px;">📌 <b>Mã GD:</b> ' + escapeHtml(req.code) + '</p>';
-    html += '<p style="margin:2px 0;color:#888;font-size:12px;">⏰ <b>Thời gian:</b> ' + req.time + '</p>';
-    html += '<div style="display:flex;gap:8px;margin-top:10px;">';
-    html += '<button onclick="approveRecharge(\'' + req.code + '\')" style="flex:1;padding:8px;background:#16a34a;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;">✅ Duyệt cộng tiền</button>';
-    html += '<button onclick="rejectRecharge(\'' + req.code + '\')" style="flex:1;padding:8px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;">❌ Từ chối</button>';
-    html += '</div></div>';
-  }
-  
-  html += '</div>';
-
-  showPopup("📥 Danh sách chờ duyệt", html, "info");
-}
-
-function approveRecharge(code) {
-  var pending = getPendingApprovals();
-  var reqIndex = -1;
-  
-  for (var i = 0; i < pending.length; i++) {
-    if (pending[i].code === code) {
-      reqIndex = i;
-      break;
-    }
-  }
-
-  if (reqIndex === -1) {
-    showPopup("Lỗi", "Không tìm thấy giao dịch này!", "error");
-    return;
-  }
-
-  var req = pending[reqIndex];
-
-  // 1. Cộng tiền cho khách
-  addUserBalance(req.username, req.amount);
-
-  // 2. Lưu lịch sử nạp
-  var history = getRechargeHistory();
-  history.push({
-    username: req.username,
-    amount: req.amount,
-    code: req.code,
-    time: new Date().toLocaleString('vi-VN'),
-    type: 'recharge'
-  });
-  saveRechargeHistory(history);
-
-  // 3. Xóa yêu cầu khỏi danh sách chờ
-  pending.splice(reqIndex, 1);
-  savePendingApprovals(pending);
-
-  // 4. Thông báo kết quả
-  showPopup("Thành công 🎉", "Đã cộng <b>" + money(req.amount) + "</b> cho <b>" + escapeHtml(req.username) + "</b>", "success", function() {
-    updateBalanceUI();
-    showAdminPendingList();
-  });
-}
-
-function rejectRecharge(code) {
-  var pending = getPendingApprovals();
-  var newPending = pending.filter(function(item) { return item.code !== code; });
-  
-  savePendingApprovals(newPending);
-  showPopup("Đã từ chối", "Đã xóa yêu cầu nạp tiền mã " + escapeHtml(code), "success", function() {
-    showAdminPendingList();
-  });
-}
-
-// =============================================
 // LICH SU NAP TIEN
 // =============================================
 
@@ -249,6 +175,22 @@ function getRechargeHistory() {
 
 function saveRechargeHistory(history) {
   localStorage.setItem('rechargeHistory', JSON.stringify(history));
+}
+
+// =============================================
+// LICH SU TRU TIEN
+// =============================================
+
+function getRemoveHistory() {
+  var data = localStorage.getItem('removeHistory');
+  if (data) {
+    try { return JSON.parse(data); } catch(e) { return []; }
+  }
+  return [];
+}
+
+function saveRemoveHistory(history) {
+  localStorage.setItem('removeHistory', JSON.stringify(history));
 }
 
 // =============================================
@@ -293,7 +235,7 @@ function showPopup(title, message, type, callback) {
   modal.innerHTML = `
     <div style="font-size:48px;margin-bottom:8px;">${icon}</div>
     <h2 style="color:white;margin:0 0 6px;font-size:20px;">${title}</h2>
-    <div style="color:#b0b8e0;margin:0 0 20px;font-size:15px;line-height:1.5;">${message}</div>
+    <p style="color:#b0b8e0;margin:0 0 20px;font-size:15px;line-height:1.5;">${message}</p>
     <div id="popup-buttons" style="display:flex;gap:12px;justify-content:center;"></div>
   `;
 
@@ -317,6 +259,8 @@ function showPopup(title, message, type, callback) {
       cursor:pointer;
       transition:0.3s;
     `;
+    cancelBtn.onmouseover = function() { this.style.background = "rgba(106,63,255,0.2)"; };
+    cancelBtn.onmouseout = function() { this.style.background = "transparent"; };
     cancelBtn.onclick = function() {
       document.body.removeChild(overlay);
       if (callback) callback(false);
@@ -336,6 +280,8 @@ function showPopup(title, message, type, callback) {
       cursor:pointer;
       transition:0.3s;
     `;
+    okBtn.onmouseover = function() { this.style.transform = "scale(1.02)"; };
+    okBtn.onmouseout = function() { this.style.transform = "scale(1)"; };
     okBtn.onclick = function() {
       document.body.removeChild(overlay);
       if (callback) callback(true);
@@ -357,6 +303,8 @@ function showPopup(title, message, type, callback) {
       cursor:pointer;
       transition:0.3s;
     `;
+    okBtn.onmouseover = function() { this.style.transform = "scale(1.02)"; };
+    okBtn.onmouseout = function() { this.style.transform = "scale(1)"; };
     okBtn.onclick = function() {
       document.body.removeChild(overlay);
       if (callback) callback();
@@ -364,10 +312,17 @@ function showPopup(title, message, type, callback) {
 
     btnContainer.appendChild(okBtn);
   }
+
+  var style = document.createElement("style");
+  style.textContent = `
+    @keyframes popupFadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes popupScaleIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
+  `;
+  document.head.appendChild(style);
 }
 
 // =============================================
-// XEM LICH SU GIAO DICH
+// XEM LICH SU (CHO NGUOI DUNG)
 // =============================================
 
 function getUserHistory() {
@@ -379,10 +334,14 @@ function getUserHistory() {
 
   var history = getRechargeHistory();
   var userHistory = [];
+  var totalAmount = 0;
   
   for (var i = 0; i < history.length; i++) {
     if (history[i].username === user.name) {
       userHistory.push(history[i]);
+      if (history[i].type !== 'remove') {
+        totalAmount += history[i].amount;
+      }
     }
   }
 
@@ -398,17 +357,34 @@ function getUserHistory() {
     var sign = isRemove ? '' : '+';
     var color = isRemove ? '#ff6b6b' : '#51cf66';
     var label = isRemove ? 'Trừ tiền' : 'Nạp tiền';
+    var codeDisplay = isRemove ? (h.reason || 'Không có lý do') : h.code;
     
     html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a4a;font-size:14px;">';
     html += '<span style="color:#888;font-size:12px;">' + h.time + '</span>';
-    html += '<span style="color:' + color + ';">' + sign + money(Math.abs(h.amount)) + '</span>';
-    html += '<span style="color:#888;font-size:11px;">' + escapeHtml(h.code || '') + '</span>';
+    html += '<span style="color:' + color + ';">' + sign + formatMoney(Math.abs(h.amount)) + '</span>';
+    html += '<span style="color:#888;font-size:11px;">' + codeDisplay + '</span>';
     html += '<span style="font-size:11px;color:#666;">' + label + '</span>';
     html += '</div>';
   }
   html += '</div>';
+  
+  var totalNap = 0;
+  for (var i = 0; i < userHistory.length; i++) {
+    if (userHistory[i].type !== 'remove') {
+      totalNap += userHistory[i].amount;
+    }
+  }
+  
+  html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #4e3aa2;font-weight:bold;color:#ffd43b;">';
+  html += '💰 Tổng đã nạp: ' + formatMoney(totalNap);
+  html += ' | 💳 Số dư hiện tại: ' + formatMoney(getUserBalance(user.name));
+  html += '</div>';
 
   showPopup("📋 Lịch sử giao dịch", html, "success");
+}
+
+function formatMoney(n) {
+  return n.toLocaleString('vi-VN') + 'đ';
 }
 
 // =============================================
@@ -438,6 +414,8 @@ function filterProducts(category) {
   var tabs = document.querySelectorAll('.category-tab');
   for (var i = 0; i < tabs.length; i++) {
     tabs[i].classList.remove('active');
+  }
+  for (var i = 0; i < tabs.length; i++) {
     if (tabs[i].getAttribute('data-category') === category) {
       tabs[i].classList.add('active');
     }
@@ -455,6 +433,17 @@ function filterProducts(category) {
   }
   
   renderProducts(filtered);
+  
+  var titleMap = {
+    'all': 'Tất cả sản phẩm',
+    'dinhvi': '📍 Định vị',
+    'fileaim': '📁 File AIM',
+    'mod': '🎮 Mod'
+  };
+  var titleEl = document.getElementById('categoryTitle');
+  if (titleEl) {
+    titleEl.textContent = titleMap[category] || 'Sản phẩm';
+  }
 }
 
 // =============================================
@@ -463,7 +452,7 @@ function filterProducts(category) {
 
 function productCard(p) {
   return '<article class="product-card">' +
-    '<img class="product-image" src="' + p.image + '" alt="' + escapeHtml(p.name) + '" onerror="this.style.opacity=\'.15\';">' +
+    '<img class="product-image" src="' + p.image + '" alt="' + escapeHtml(p.name) + '" onerror="this.style.opacity=\'.15\'; this.alt=\'Khong tim thay anh\';">' +
     '<div class="product-info">' +
       '<h3 class="product-name">' + escapeHtml(p.name) + '</h3>' +
       '<div class="price">' + money(p.price) + '</div>' +
@@ -495,28 +484,35 @@ function renderProducts(list) {
 }
 
 // =============================================
-// TIM KIEM SAN PHAM
+// TIM KIEM
 // =============================================
 
 function searchProducts() {
   var input = $("searchInput");
-  if (!input) return;
   var q = input.value.trim().toLowerCase();
   var result = [];
   
-  for (var i = 0; i < products.length; i++) {
-    var matchCategory = (currentCategory === 'all' || products[i].category === currentCategory);
-    var matchName = products[i].name.toLowerCase().includes(q);
-    if (matchCategory && matchName) {
-      result.push(products[i]);
+  if (currentCategory === 'all') {
+    for (var i = 0; i < products.length; i++) {
+      if (products[i].name.toLowerCase().includes(q)) {
+        result.push(products[i]);
+      }
+    }
+  } else {
+    for (var i = 0; i < products.length; i++) {
+      if (products[i].category === currentCategory && products[i].name.toLowerCase().includes(q)) {
+        result.push(products[i]);
+      }
     }
   }
   
   renderProducts(result);
+  var noProducts = $("noProducts");
+  if (noProducts) noProducts.hidden = (result.length > 0);
 }
 
 // =============================================
-// MUA NGAY
+// MUA NGAY (DUNG SO DU + TU DONG MO FILE)
 // =============================================
 
 function buyNow(productId) {
@@ -535,7 +531,7 @@ function buyNow(productId) {
   if (balance < product.price) {
     showPopup(
       "⚠️ Số dư không đủ!",
-      "Bạn cần <strong style='color:#ff59e8;'>" + money(product.price) + "</strong> để mua sản phẩm này.<br>💰 Số dư hiện tại: <strong style='color:#51cf66;'>" + money(balance) + "</strong>",
+      "Bạn cần <strong style='color:#ff59e8;'>" + money(product.price) + "</strong> để mua sản phẩm này.<br>💰 Số dư hiện tại: <strong style='color:#51cf66;'>" + money(balance) + "</strong><br><br>Vui lòng nạp thêm tiền vào ví.",
       "error"
     );
     return;
@@ -543,23 +539,29 @@ function buyNow(productId) {
 
   showPopup(
     "Xác nhận mua hàng",
-    "Bạn có chắc muốn mua <strong>" + escapeHtml(product.name) + "</strong> giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong>?",
+    "Bạn có chắc muốn mua <strong>" + product.name + "</strong> với giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong>?<br><br>💰 Số dư hiện tại: <strong style='color:#51cf66;'>" + money(balance) + "</strong>",
     "confirm",
     function(result) {
       if (result) {
+        // Trừ tiền
         var newBalance = balance - product.price;
         setUserBalance(user.name, newBalance);
         updateBalanceUI();
         
+        // Lấy link file
+        var fileUrl = product.fileUrl || null;
+        
+        // Hiển thị popup thành công
         showPopup(
           "🎉 Mua hàng thành công!",
-          "Đã thanh toán thành công!<br>📥 Nhấn OK để tải file.",
+          "Bạn đã mua <strong>" + product.name + "</strong> với giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong><br><br>💰 Số dư còn lại: <strong style='color:#51cf66;'>" + money(newBalance) + "</strong><br><br>📥 Nhấn OK để tải file!",
           "success",
           function() {
-            if (product.fileUrl) {
-              window.open(product.fileUrl, '_blank');
+            // MỞ FILE SAU KHI ẤN OK
+            if (fileUrl) {
+              window.open(fileUrl, '_blank');
             } else {
-              showPopup("Thông báo", "Sản phẩm chưa có file liên kết. Vui lòng liên hệ Admin!", "error");
+              showPopup("Thông báo", "Sản phẩm này chưa có link tải. Vui lòng liên hệ admin!", "error");
             }
           }
         );
@@ -569,7 +571,7 @@ function buyNow(productId) {
 }
 
 // =============================================
-// POPUP NAP TIEN (GIAO DIEN THANH TOAN)
+// POPUP NAP TIEN
 // =============================================
 
 function showRechargePopup(rechargeCode, amount) {
@@ -579,67 +581,172 @@ function showRechargePopup(rechargeCode, amount) {
   var overlay = document.createElement("div");
   overlay.className = "custom-popup-overlay";
   overlay.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 99999; backdrop-filter: blur(10px);
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+    backdrop-filter: blur(10px);
+    animation: popupFadeIn 0.3s ease;
   `;
 
   var modal = document.createElement("div");
   modal.style.cssText = `
     background: linear-gradient(145deg, #0b0d3b, #03051d);
-    border: 1px solid #833cff; border-radius: 20px;
-    padding: 22px; max-width: 420px; width: 94%; text-align: center;
+    border: 1px solid #833cff;
+    border-radius: 20px;
+    padding: 22px 22px 28px;
+    max-width: 420px;
+    width: 94%;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(112,30,255,0.5);
+    animation: popupScaleIn 0.3s ease;
+    max-height: 95vh;
+    overflow-y: auto;
   `;
+
+  var timerId = "timer_" + rechargeCode;
 
   modal.innerHTML = `
     <div style="font-size:36px;margin-bottom:4px;">💰</div>
-    <h2 style="color:white;margin:0 0 3px;font-size:19px;">Nạp tiền vào ví</h2>
-    <p style="color:#b0b8e0;margin:0 0 14px;font-size:13px;">Quét mã QR để chuyển khoản</p>
+    <h2 style="color:white;margin:0 0 3px;font-size:19px;">Nap tien vao vi</h2>
+    <p style="color:#b0b8e0;margin:0 0 14px;font-size:13px;">Quet ma QR de chuyen khoan</p>
 
     <div style="background:#06082a;padding:14px;border-radius:12px;border:1px solid #4e3aa2;margin-bottom:14px;">
-      <img src="images/manganhang.jpg" alt="Mã QR" style="width:100%;max-width:200px;border-radius:10px;display:block;margin:0 auto;">
+      <p style="font-size:11px;color:#888;margin:0 0 8px;">📱 Quet ma QR</p>
+      <img src="images/manganhang.jpg" alt="Ma QR chuyen khoan" 
+        style="width:100%;max-width:200px;height:auto;border-radius:10px;display:block;margin:0 auto;border:1px solid #4e3aa2;"
+        onerror="this.style.display='none'; this.parentNode.innerHTML='<p style=\\'color:#ff6b6b;font-size:13px;margin:10px;\\'>⚠️ Chua co anh QR<br><span style=\\'font-size:11px;color:#888;\\'>Vui long them images/manganhang.jpg</span></p>';">
     </div>
 
-    <div style="margin:0 0 12px;text-align:left;background:#06082a;padding:12px;border-radius:12px;border:1px solid #4e3aa2;font-size:13px;color:#b0b8e0;">
-      <p style="margin:2px 0;">💳 <b>Ngân hàng:</b> MB Bank</p>
-      <p style="margin:2px 0;">🔢 <b>STK:</b> 08122261152109</p>
-      <p style="margin:2px 0;">👤 <b>Chủ TK:</b> PHAM TIEN MANH</p>
-      <p style="margin:2px 0;">💰 <b>Số tiền:</b> <span style="color:#ff59e8;font-size:16px;font-weight:bold;">${money(amount)}</span></p>
+    <div style="margin:0 0 12px;text-align:left;background:#06082a;padding:12px 14px;border-radius:12px;border:1px solid #4e3aa2;">
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💳 Ngan hang:</strong> MB Bank</p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">🔢 So tai khoan:</strong> 08122261152109</p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">👤 Chu tai khoan:</strong> PHAM TIEN MANH</p>
+      <p style="margin:2px 0;font-size:13px;color:#b0b8e0;"><strong style="color:#c8d0f5;">💰 So tien:</strong> <span style="color:#ff59e8;font-size:18px;font-weight:bold;">${money(amount)}</span></p>
     </div>
 
     <div style="margin:0 0 14px;padding:12px;background:#fff3cd;border-radius:12px;border:2px solid #ffc107;">
-      <p style="color:#856404;font-weight:bold;margin:0 0 4px;font-size:13px;">📌 Nội dung chuyển khoản:</p>
-      <p style="font-size:18px;font-weight:bold;color:#d63384;margin:0;">${rechargeCode}</p>
+      <p style="color:#856404;font-weight:bold;margin:0 0 4px;font-size:13px;">📌 Noi dung chuyen khoan:</p>
+      <p style="font-size:18px;font-weight:bold;color:#d63384;margin:0;word-break:break-all;user-select:all;letter-spacing:1px;">${rechargeCode}</p>
+      <p style="margin:6px 0 0;font-size:13px;color:#888;">
+        ⏰ Con <strong style="color:#ffd43b;font-size:16px;" id="${timerId}">10:00</strong> phut de chuyen khoan
+      </p>
     </div>
 
-    <button onclick="copyContent('${rechargeCode}')" style="width:100%;padding:10px;background:#0d6efd;color:white;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-bottom:8px;">
-      📋 Copy nội dung CK
+    <button onclick="copyContent('${rechargeCode}')" 
+      style="width:100%;padding:10px;background:linear-gradient(135deg,#0d6efd,#0b5ed7);color:white;border:none;border-radius:12px;font-size:14px;font-weight:bold;cursor:pointer;margin-bottom:8px;transition:0.3s;">
+      📋 Copy noi dung chuyen khoan
     </button>
-    <button onclick="completeRecharge('${rechargeCode}', ${amount})" style="width:100%;padding:12px;background:#16a34a;color:white;border:none;border-radius:12px;font-size:15px;font-weight:bold;cursor:pointer;">
-      ✅ Tôi đã chuyển khoản
+
+    <button onclick="completeRecharge('${rechargeCode}', ${amount})" 
+      style="width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:12px;font-size:15px;font-weight:bold;cursor:pointer;transition:0.3s;">
+      ✅ Toi da chuyen khoan
+    </button>
+
+    <button onclick="closePaymentPopup(this)" 
+      style="width:100%;margin-top:6px;padding:8px;background:transparent;color:#888;border:1px solid #4e3aa2;border-radius:12px;font-size:13px;cursor:pointer;transition:0.3s;">
+      ❌ Dong
     </button>
   `;
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+
+  var timerElement = document.getElementById(timerId);
+  if (timerElement) {
+    var pending = getPendingCodes();
+    var createdTime = 0;
+    for (var i = 0; i < pending.length; i++) {
+      if (pending[i].code === rechargeCode) {
+        createdTime = pending[i].time;
+        break;
+      }
+    }
+
+    function updateTimer() {
+      var left = Math.max(0, 600000 - (Date.now() - createdTime));
+      
+      if (left <= 0) {
+        timerElement.textContent = "0:00";
+        timerElement.style.color = "#ff6b6b";
+        setTimeout(function() {
+          var popup = document.querySelector(".custom-popup-overlay");
+          if (popup) {
+            showPopup("⏰ Het thoi gian!", "Ma nap <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> da het hieu luc.<br><br>Vui long tao ma moi de nap tien.", "error");
+            document.body.removeChild(popup);
+          }
+        }, 500);
+        return;
+      }
+      
+      var minutes = Math.floor(left / 60000);
+      var seconds = Math.floor((left % 60000) / 1000);
+      timerElement.textContent = minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+      
+      timerElement.style.color = left < 60000 ? "#ff6b6b" : "#ffd43b";
+      
+      requestAnimationFrame(updateTimer);
+    }
+    
+    updateTimer();
+  }
+
+  overlay.onclick = function(e) {
+    if (e.target === overlay) {
+      document.body.removeChild(overlay);
+    }
+  };
+}
+
+function closePaymentPopup(btn) {
+  var overlay = btn.closest(".custom-popup-overlay");
+  if (overlay) document.body.removeChild(overlay);
 }
 
 function copyContent(text) {
-  navigator.clipboard.writeText(text).then(function() {
-    showPopup("✅ Đã copy!", "Nội dung chuyển khoản đã được chép.", "success");
-  });
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      showPopup("✅ Da copy!", "Noi dung chuyen khoan da duoc sao chep.", "success");
+    }).catch(function() {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  var textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  document.body.appendChild(textArea);
+  textArea.select();
+  try {
+    document.execCommand("copy");
+    showPopup("✅ Da copy!", "Noi dung chuyen khoan da duoc sao chep.", "success");
+  } catch (err) {
+    showPopup("❌ Loi!", "Khong the copy, vui long copy thu cong.", "error");
+  }
+  document.body.removeChild(textArea);
 }
 
 // =============================================
-// XAC NHAN NAP TIEN (GUI YEU CAU TOI ADMIN)
+// XAC NHAN NAP TIEN (CHO ADMIN DUYET)
 // =============================================
 
 function completeRecharge(rechargeCode, amount) {
   var user = currentUser();
-  if (!user) return;
+  if (!user) {
+    showPopup("Loi", "Vui long đăng nhập!", "error");
+    return;
+  }
 
   if (!isCodeValid(rechargeCode)) {
-    showPopup("⚠️ Mã đã hết hạn!", "Mã nạp tiền đã hết hiệu lực. Vui lòng tạo mã mới.", "error");
+    showPopup("⚠️ Ma da het han!", "Ma nap tien <strong style='color:#ff6b6b;'>" + rechargeCode + "</strong> da het hieu luc sau 10 phut.<br><br>Vui long tao ma moi de nap tien.", "error");
     return;
   }
 
@@ -654,22 +761,23 @@ function completeRecharge(rechargeCode, amount) {
     time: new Date().toLocaleString('vi-VN'),
     status: 'pending'
   });
-  savePendingApprovals(pendingApprovals);
+  localStorage.setItem('pendingApprovals', JSON.stringify(pendingApprovals));
 
   showPopup(
-    "⏳ Đã gửi yêu cầu!",
-    "Yêu cầu nạp <b>" + money(amount) + "</b> với mã <b>" + rechargeCode + "</b> đã được gửi.<br>Vui lòng chờ Admin xác nhận!",
+    "⏳ Cho admin xac nhan!",
+    "Ban da gui yeu cau nap <strong style='color:#ff59e8;'>" + money(amount) + "</strong>.<br><br>📌 Ma giao dich: <strong style='color:#ffd43b;'>" + rechargeCode + "</strong><br><br>⏳ Vui long doi admin xac nhan chuyen khoan.<br>💰 So du se duoc cap nhat sau khi admin duyet.",
     "success"
   );
 }
 
 // =============================================
-// HE THONG DANG NHAP / DANG KY
+// HE THONG DANG NHAP
 // =============================================
 
 function initUsers() {
   if (!localStorage.getItem("shopCuaManhUsers")) {
     localStorage.setItem("shopCuaManhUsers", JSON.stringify(defaultUsers));
+    console.log("Da tao tai khoan mac dinh!");
   }
 }
 
@@ -701,61 +809,139 @@ function removeCurrentUser() {
   localStorage.removeItem("shopCuaManhCurrentUser");
 }
 
+// =============================================
+// CAP NHAT SO DU TREN HEADER
+// =============================================
+
 function updateBalanceUI() {
   var balanceEl = document.getElementById("userBalance");
+  if (!balanceEl) {
+    var navActions = document.querySelector(".nav-actions");
+    if (navActions) {
+      var authBtn = document.getElementById("openLoginBtn");
+      if (authBtn) {
+        balanceEl = document.createElement("span");
+        balanceEl.id = "userBalance";
+        balanceEl.style.cssText = "color:#51cf66;font-weight:bold;font-size:13px;margin-right:6px;display:none;";
+        balanceEl.textContent = "0d";
+        navActions.insertBefore(balanceEl, authBtn);
+      }
+    }
+  }
+  
+  if (!balanceEl) return;
+  
   var user = currentUser();
-  if (balanceEl && user) {
-    balanceEl.textContent = money(getUserBalance(user.name));
+  if (user) {
+    var balance = getUserBalance(user.name);
+    balanceEl.textContent = money(balance);
     balanceEl.style.display = "inline";
-  } else if (balanceEl) {
+    console.log("✅ So du da duoc cap nhat: " + money(balance));
+  } else {
     balanceEl.style.display = "none";
   }
 }
 
+// =============================================
+// NAP TIEN
+// =============================================
+
 function recharge() {
   var user = currentUser();
   if (!user) {
-    showPopup("Thông báo", "Vui lòng đăng nhập để nạp tiền!", "error", function() { openLogin(); });
+    showPopup("Thong bao", "Vui long dang nhap de nap tien!", "error", function() {
+      openLogin();
+    });
     return;
   }
+
   showRechargeOptions();
 }
 
 function showRechargeOptions() {
+  var user = currentUser();
+  if (!user) return;
+
   var amounts = [10000, 20000, 50000, 100000, 200000, 500000];
+  
   var overlay = document.createElement("div");
   overlay.className = "custom-popup-overlay";
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:99999;";
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+    backdrop-filter: blur(8px);
+    animation: popupFadeIn 0.3s ease;
+  `;
 
   var modal = document.createElement("div");
-  modal.style.cssText = "background:#0b0d3b;border:1px solid #833cff;border-radius:20px;padding:24px;max-width:420px;width:92%;text-align:center;";
+  modal.style.cssText = `
+    background: linear-gradient(145deg, #0b0d3b, #03051d);
+    border: 1px solid #833cff;
+    border-radius: 20px;
+    padding: 24px;
+    max-width: 420px;
+    width: 92%;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(112,30,255,0.5);
+    animation: popupScaleIn 0.3s ease;
+  `;
 
-  var html = '<h2 style="color:white;margin-bottom:12px;">Chọn số tiền nạp</h2>';
+  var html = '<div style="font-size:40px;margin-bottom:6px;">💰</div>';
+  html += '<h2 style="color:white;margin:0 0 4px;font-size:20px;">Chon so tien nap</h2>';
+  html += '<p style="color:#b0b8e0;margin:0 0 16px;font-size:13px;">Chon muc tien ban muon nap vao vi</p>';
   html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
+  
   for (var i = 0; i < amounts.length; i++) {
-    html += '<button onclick="selectRechargeAmount(' + amounts[i] + ')" style="padding:12px;background:#6a3fff;border:none;border-radius:12px;color:white;font-weight:bold;cursor:pointer;">' + money(amounts[i]) + '</button>';
+    html += '<button onclick="selectRechargeAmount(' + amounts[i] + ')" style="';
+    html += 'padding:12px;background:linear-gradient(135deg,#6a3fff,#a855f7);border:none;border-radius:12px;color:white;font-size:15px;font-weight:bold;cursor:pointer;transition:0.3s;';
+    html += '" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">';
+    html += money(amounts[i]);
+    html += '</button>';
   }
+  
   html += '</div>';
+  html += '<button onclick="closePopupOverlay(this)" style="';
+  html += 'width:100%;padding:10px;background:transparent;color:#888;border:1px solid #4e3aa2;border-radius:12px;font-size:14px;cursor:pointer;';
+  html += '">❌ Dong</button>';
 
   modal.innerHTML = html;
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+  overlay.onclick = function(e) {
+    if (e.target === overlay) {
+      document.body.removeChild(overlay);
+    }
+  };
+}
+
+function closePopupOverlay(btn) {
+  var overlay = btn.closest(".custom-popup-overlay");
+  if (overlay) document.body.removeChild(overlay);
 }
 
 function selectRechargeAmount(amount) {
   var overlay = document.querySelector(".custom-popup-overlay");
   if (overlay) document.body.removeChild(overlay);
 
+  var user = currentUser();
+  if (!user) return;
+
   cleanExpiredCodes();
+
   var rechargeCode = generateRechargeCode();
   savePendingCode(rechargeCode, amount);
+  
   showRechargePopup(rechargeCode, amount);
 }
 
 // =============================================
-// XU LY UI AUTHCATION & FORM
+// DANG NHAP / DANG KY - UI
 // =============================================
 
 var loginModal = $("loginModal");
@@ -781,7 +967,6 @@ var logoutBtn = $("logoutBtn");
 var registerMode = false;
 
 function updateAuthFieldsState() {
-  if (!loginNameInput) return;
   loginNameInput.disabled = registerMode;
   loginPasswordInput.disabled = registerMode;
   registerNameInput.disabled = !registerMode;
@@ -790,20 +975,19 @@ function updateAuthFieldsState() {
 }
 
 function openLogin() {
-  if (!loginModal) return;
   var user = currentUser();
   if (user) {
     authForm.hidden = true;
-    if (switchAuthBtn) switchAuthBtn.hidden = true;
-    if (logoutBtn) logoutBtn.hidden = false;
+    switchAuthBtn.hidden = true;
+    logoutBtn.hidden = false;
     loginFields.hidden = true;
     registerFields.hidden = true;
-    authMessage.textContent = "Xin chào: " + user.name;
+    authMessage.textContent = "Xin chao: " + user.name;
     authMessage.style.color = "#ffd43b";
   } else {
     authForm.hidden = false;
-    if (switchAuthBtn) switchAuthBtn.hidden = false;
-    if (logoutBtn) logoutBtn.hidden = true;
+    switchAuthBtn.hidden = false;
+    logoutBtn.hidden = true;
     loginFields.hidden = registerMode;
     registerFields.hidden = !registerMode;
     authMessage.textContent = "";
@@ -812,177 +996,300 @@ function openLogin() {
 }
 
 function closeLogin() {
-  if (!loginModal) return;
   loginModal.classList.remove("open");
-  if (authMessage) authMessage.textContent = "";
-  if (authForm) {
-    authForm.hidden = false;
-    authForm.reset();
-  }
-  if (switchAuthBtn) switchAuthBtn.hidden = false;
-  if (logoutBtn) logoutBtn.hidden = true;
+  authMessage.textContent = "";
+  authForm.hidden = false;
+  switchAuthBtn.hidden = false;
+  logoutBtn.hidden = true;
   updateAuthFieldsState();
 }
 
 function updateAuthUI() {
   var user = currentUser();
 
-  if (loginLabel) loginLabel.textContent = user ? user.name : "Đăng nhập";
-  if (authTitle) authTitle.textContent = registerMode ? "Tạo tài khoản" : "Đăng nhập";
-  if (authSubmit) authSubmit.textContent = registerMode ? "Đăng ký" : "Đăng nhập";
-  if (loginFields) loginFields.hidden = registerMode;
-  if (registerFields) registerFields.hidden = !registerMode;
-  
-  if (switchAuthBtn) {
-    switchAuthBtn.innerHTML = registerMode ? 'Đã có tài khoản? <b>Đăng nhập</b>' : 'Chưa có tài khoản? <b>Đăng ký</b>';
+  if (user) {
+    loginLabel.textContent = user.name;
+  } else {
+    loginLabel.textContent = "Dang nhap";
   }
+
+  authTitle.textContent = registerMode ? "Tao tai khoan" : "Dang nhap";
+  authSubtitle.textContent = registerMode
+    ? "Tao tai khoan de luu thong tin mua hang"
+    : "Dang nhap de tiep tuc mua hang";
+  authSubmit.textContent = registerMode ? "Dang ky" : "Dang nhap";
+  loginFields.hidden = registerMode;
+  registerFields.hidden = !registerMode;
+  switchAuthBtn.innerHTML = registerMode
+    ? 'Da co tai khoan? <b>Dang nhap</b>'
+    : 'Chua co tai khoan? <b>Dang ky</b>';
 
   updateAuthFieldsState();
   updateBalanceUI();
 }
 
-if (openLoginBtn) openLoginBtn.addEventListener("click", openLogin);
-if (closeLoginBtn) closeLoginBtn.addEventListener("click", closeLogin);
-if (closeLoginBackdrop) closeLoginBackdrop.addEventListener("click", closeLogin);
+openLoginBtn.addEventListener("click", openLogin);
+closeLoginBtn.addEventListener("click", closeLogin);
+closeLoginBackdrop.addEventListener("click", closeLogin);
 
-if (switchAuthBtn) {
-  switchAuthBtn.addEventListener("click", function() {
-    registerMode = !registerMode;
-    authMessage.textContent = "";
-    authForm.hidden = false;
-    if (logoutBtn) logoutBtn.hidden = true;
-    authForm.reset();
-    updateAuthUI();
-  });
-}
+switchAuthBtn.addEventListener("click", function() {
+  registerMode = !registerMode;
+  authMessage.textContent = "";
+  authForm.hidden = false;
+  logoutBtn.hidden = true;
+  authForm.reset();
+  updateAuthUI();
+});
 
-if (authForm) {
-  authForm.addEventListener("submit", function(e) {
-    e.preventDefault();
+authForm.addEventListener("submit", function(e) {
+  e.preventDefault();
 
-    if (registerMode) {
-      var name = registerNameInput.value.trim();
-      var password = registerPasswordInput.value;
-      var confirm = registerConfirmInput.value;
+  if (registerMode) {
+    var name = registerNameInput.value.trim();
+    var password = registerPasswordInput.value;
+    var confirm = registerConfirmInput.value;
 
-      if (!name || !password || !confirm) {
-        authMessage.textContent = "Vui lòng nhập đầy đủ thông tin.";
+    if (!name || !password || !confirm) {
+      authMessage.textContent = "Vui long nhap day du thong tin.";
+      authMessage.style.color = "#ff6b6b";
+      return;
+    }
+    if (password.length < 4) {
+      authMessage.textContent = "Mat khau phai co it nhat 4 ky tu.";
+      authMessage.style.color = "#ff6b6b";
+      return;
+    }
+    if (password !== confirm) {
+      authMessage.textContent = "Mat khau xac minh khong khop!";
+      authMessage.style.color = "#ff6b6b";
+      return;
+    }
+
+    var users = getUsers();
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].name.toLowerCase() === name.toLowerCase()) {
+        authMessage.textContent = "Ten hien thi nay da ton tai.";
         authMessage.style.color = "#ff6b6b";
         return;
       }
-      if (password !== confirm) {
-        authMessage.textContent = "Mật khẩu không khớp!";
-        authMessage.style.color = "#ff6b6b";
-        return;
-      }
+    }
 
-      var users = getUsers();
-      for (var i = 0; i < users.length; i++) {
-        if (users[i].name.toLowerCase() === name.toLowerCase()) {
-          authMessage.textContent = "Tên tài khoản này đã tồn tại.";
-          authMessage.style.color = "#ff6b6b";
-          return;
-        }
-      }
-
-      users.push({ name: name, password: password });
-      saveUsers(users);
+    users.push({ name: name, password: password });
+    saveUsers(users);
+    
+    if (!localStorage.getItem("shopCuaManhBalance_" + name)) {
       setUserBalance(name, 0);
+    }
 
-      registerMode = false;
-      authMessage.textContent = "Đăng ký thành công! Vui lòng đăng nhập.";
-      authMessage.style.color = "#51cf66";
-      updateAuthUI();
-    } else {
-      var name = loginNameInput.value.trim();
-      var password = loginPasswordInput.value;
+    registerMode = false;
+    loginNameInput.value = name;
+    loginPasswordInput.value = "";
+    registerNameInput.value = "";
+    registerPasswordInput.value = "";
+    registerConfirmInput.value = "";
 
-      var users = getUsers();
-      var user = null;
-      for (var i = 0; i < users.length; i++) {
-        if (users[i].name.toLowerCase() === name.toLowerCase() && users[i].password === password) {
-          user = users[i];
-          break;
-        }
+    authMessage.textContent = "Dang ky thanh cong! Hay nhap mat khau de dang nhap.";
+    authMessage.style.color = "#51cf66";
+    updateAuthUI();
+
+    setTimeout(function() {
+      loginPasswordInput.focus();
+    }, 100);
+  } else {
+    var name = loginNameInput.value.trim();
+    var password = loginPasswordInput.value;
+
+    if (!name || !password) {
+      authMessage.textContent = "Vui long nhap ten hien thi va mat khau.";
+      authMessage.style.color = "#ff6b6b";
+      return;
+    }
+
+    var users = getUsers();
+    var user = null;
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].name.toLowerCase() === name.toLowerCase() &&
+          users[i].password === password) {
+        user = users[i];
+        break;
       }
+    }
 
-      if (!user) {
-        authMessage.textContent = "Sai tên đăng nhập hoặc mật khẩu.";
-        authMessage.style.color = "#ff6b6b";
-        return;
-      }
+    if (!user) {
+      authMessage.textContent = "Sai ten hien thi hoac mat khau.";
+      authMessage.style.color = "#ff6b6b";
+      return;
+    }
 
-      setCurrentUser({ name: user.name });
-      updateAuthUI();
+    setCurrentUser({ name: user.name });
+    authMessage.textContent = "Dang nhap thanh cong!";
+    authMessage.style.color = "#51cf66";
+    updateAuthUI();
+
+    setTimeout(function() {
       closeLogin();
-      showPopup("Thành công", "Chào mừng " + user.name + " đã đăng nhập!", "success");
+      authForm.reset();
+      showPopup("Chao mung! 🎉", "Chao mung <strong>" + user.name + "</strong> quay tro lai!", "success");
+    }, 500);
+  }
+});
+
+logoutBtn.addEventListener("click", function() {
+  showPopup("Xac nhan dang xuat", "Ban co chac muon dang xuat?", "confirm", function(result) {
+    if (result) {
+      removeCurrentUser();
+      authForm.hidden = false;
+      switchAuthBtn.hidden = false;
+      logoutBtn.hidden = true;
+      registerMode = false;
+      authForm.reset();
+      authMessage.textContent = "Da dang xuat.";
+      authMessage.style.color = "#ffd43b";
+      updateAuthUI();
+      showPopup("Da dang xuat", "Ban da dang xuat thanh cong!", "success");
     }
   });
+});
+
+// =============================================
+// MODAL LIEN HE
+// =============================================
+
+function openContact() {
+  var modal = document.getElementById('contactModal');
+  if (modal) {
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  return false;
 }
 
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", function() {
-    removeCurrentUser();
-    updateAuthUI();
-    closeLogin();
-    showPopup("Thông báo", "Đã đăng xuất thành công!", "success");
+function closeContact() {
+  var modal = document.getElementById('contactModal');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// =============================================
+// HIEU UNG MUA
+// =============================================
+
+var canvas = $("rainCanvas");
+if (canvas) {
+  var ctx = canvas.getContext("2d");
+  var drops = [];
+  var w = window.innerWidth, h = window.innerHeight;
+  canvas.width = w; canvas.height = h;
+  for (var i = 0; i < 120; i++) {
+    drops.push({ x: Math.random() * w, y: Math.random() * h, speed: 3 + Math.random() * 5, len: 10 + Math.random() * 15, opacity: 0.1 + Math.random() * 0.3 });
+  }
+  function drawRain() {
+    ctx.clearRect(0, 0, w, h);
+    for (var i = 0; i < drops.length; i++) {
+      var d = drops[i];
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - 2, d.y + d.len);
+      ctx.strokeStyle = "rgba(130,185,255," + d.opacity + ")";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      d.y += d.speed;
+      if (d.y > h) { d.y = -d.len; d.x = Math.random() * w; }
+    }
+    requestAnimationFrame(drawRain);
+  }
+  drawRain();
+  window.addEventListener("resize", function() {
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = w; canvas.height = h;
   });
 }
 
 // =============================================
-// NOIDUNG HEADER DANG BUTTONS
+// THEM NUT NAP TIEN + LICH SU + SO DU
 // =============================================
 
 function addNavButtons() {
   var navActions = document.querySelector(".nav-actions");
   if (!navActions) return;
-
+  
   if (document.getElementById("rechargeBtn")) return;
-
+  
   var balanceSpan = document.createElement("span");
   balanceSpan.id = "userBalance";
   balanceSpan.style.cssText = "color:#51cf66;font-weight:bold;font-size:13px;margin-right:6px;display:none;";
-
+  balanceSpan.textContent = "0d";
+  
   var rechargeBtn = document.createElement("button");
   rechargeBtn.className = "login-top";
   rechargeBtn.id = "rechargeBtn";
-  rechargeBtn.innerHTML = '💰 Nạp tiền';
+  rechargeBtn.type = "button";
+  rechargeBtn.style.cssText = "border-color:#ff59e8;";
+  rechargeBtn.innerHTML = '💰 <span id="rechargeLabel">Nap tien</span>';
   rechargeBtn.onclick = recharge;
-
+  
   var historyBtn = document.createElement("button");
   historyBtn.className = "login-top";
   historyBtn.id = "historyBtn";
-  historyBtn.innerHTML = '📋 Lịch sử';
+  historyBtn.type = "button";
+  historyBtn.style.cssText = "border-color:#3b82f6;";
+  historyBtn.innerHTML = '📋 <span id="historyLabel">Lich su</span>';
   historyBtn.onclick = getUserHistory;
-
-  var adminBtn = document.createElement("button");
-  adminBtn.className = "login-top";
-  adminBtn.id = "adminBtn";
-  adminBtn.style.cssText = "border-color:#ff4757;color:#ff4757;";
-  adminBtn.innerHTML = '👑 Admin Duyệt';
-  adminBtn.onclick = showAdminPendingList;
-
+  
   var authBtn = document.getElementById("openLoginBtn");
   if (authBtn) {
     navActions.insertBefore(balanceSpan, authBtn);
     navActions.insertBefore(rechargeBtn, authBtn);
     navActions.insertBefore(historyBtn, authBtn);
-    navActions.insertBefore(adminBtn, authBtn);
   }
 }
 
 // =============================================
-// KHOI CHAY UNG DUNG
+// KHOI CHAY
 // =============================================
 
 document.addEventListener("DOMContentLoaded", function() {
   initUsers();
+  
   filterProducts('all');
-  addNavButtons();
+  
   updateAuthUI();
-
+  updateAuthFieldsState();
+  addNavButtons();
+  
+  setTimeout(function() {
+    updateBalanceUI();
+  }, 100);
+  
   var searchInput = $("searchInput");
+  var searchBtn = $("searchBtn");
   if (searchInput) searchInput.addEventListener("input", searchProducts);
-
-  setInterval(cleanExpiredCodes, 30000);
+  if (searchBtn) searchBtn.addEventListener("click", searchProducts);
+  
+  var closeContactBtn = document.getElementById('closeContactBtn');
+  var closeContactBackdrop = document.getElementById('closeContactBackdrop');
+  if (closeContactBtn) {
+    closeContactBtn.addEventListener('click', closeContact);
+  }
+  if (closeContactBackdrop) {
+    closeContactBackdrop.addEventListener('click', closeContact);
+  }
+  
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+      closeLogin();
+      closeContact();
+      var popup = document.querySelector(".custom-popup-overlay");
+      if (popup) document.body.removeChild(popup);
+    }
+  });
+  
+  setInterval(function() {
+    cleanExpiredCodes();
+  }, 30000);
+  
+  console.log("Shop Cua Manh da san sang!");
+  console.log("Tai khoan mac dinh:");
 });

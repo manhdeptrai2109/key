@@ -540,21 +540,17 @@ function buyNow(productId) {
     "confirm",
     function(result) {
       if (result) {
-        // Trừ tiền
         var newBalance = balance - product.price;
         setUserBalance(user.name, newBalance);
         updateBalanceUI();
         
-        // Lấy link file
         var fileUrl = product.fileUrl || null;
         
-        // Hiển thị popup thành công
         showPopup(
           "🎉 Mua hàng thành công!",
           "Bạn đã mua <strong>" + product.name + "</strong> với giá <strong style='color:#ff59e8;'>" + money(product.price) + "</strong><br><br>💰 Số dư còn lại: <strong style='color:#51cf66;'>" + money(newBalance) + "</strong><br><br>📥 Nhấn OK để tải file!",
           "success",
           function() {
-            // MỞ FILE SAU KHI ẤN OK
             if (fileUrl) {
               window.open(fileUrl, '_blank');
             } else {
@@ -1304,3 +1300,38 @@ document.addEventListener("DOMContentLoaded", function() {
     cleanExpiredCodes();
   }, 30000);
 });
+
+// =============================================
+// BAO VE WEBSITE: CHAN F12, CHUOT PHAI, DEVTOOLS
+// =============================================
+
+// 1. Chặn F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
+document.addEventListener("keydown", function (e) {
+  if (
+    e.key === "F12" ||
+    (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) ||
+    (e.ctrlKey && (e.key === "U" || e.key === "u" || e.key === "S" || e.key === "s"))
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }
+});
+
+// 2. Chặn menu chuột phải (ContextMenu)
+document.addEventListener("contextmenu", function (e) {
+  e.preventDefault();
+  return false;
+});
+
+// 3. Vòng lặp Debugger (Treo/Giật lag trang nếu cố tình mở DevTools)
+setInterval(function () {
+  var startTime = performance.now();
+  (function () {
+    debugger;
+  })();
+  var endTime = performance.now();
+  if (endTime - startTime > 100) {
+    document.body.innerHTML = "<h1 style='color:white;text-align:center;margin-top:20%;font-family:sans-serif;'>Hành vi bị cấm! DevTools đã bị vô hiệu hóa.</h1>";
+  }
+}, 500);
